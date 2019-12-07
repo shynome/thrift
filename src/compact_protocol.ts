@@ -69,7 +69,7 @@ export class TCompactProtocol {
   public string_buf_size_ = 0;
   public container_limit_ = 0;
   public booleanField_ = {
-    name: null as any as string,
+    name: null as null | string,
     hasBoolValue: false,
     fieldType: ThriftType.BOOL,
     fieldId: null as any as number,
@@ -210,7 +210,7 @@ export class TCompactProtocol {
 
   writeMessageEnd() {
   };
-  writeStructBegin(name) {
+  writeStructBegin(name: any) {
     this.lastField_.push(this.lastFieldId_);
     this.lastFieldId_ = 0;
   };
@@ -257,610 +257,605 @@ export class TCompactProtocol {
   writeMapEnd() {
   };
 
-}
+  /**
+   * Writes a list collection header
+   * @param elemType - The Thrift type of the list elements.
+   * @param size - The number of elements in the list.
+   */
+  writeListBegin(elemType: ThriftType, size: number) {
+    this.writeCollectionBegin(elemType, size);
+  };
+  writeListEnd() {
+  };
 
+  /**
+   * Writes a set collection header
+   * @param elemType - The Thrift type of the set elements.
+   * @param size - The number of elements in the set.
+   */
+  writeSetBegin(elemType: ThriftType, size: number) {
+    this.writeCollectionBegin(elemType, size);
+  };
+  writeSetEnd() {
+  };
 
-
-/**
- * Writes a list collection header
- * @param {number} elemType - The Thrift type of the list elements.
- * @param {number} size - The number of elements in the list.
- */
-TCompactProtocol.prototype.writeListBegin = function (elemType, size) {
-  this.writeCollectionBegin(elemType, size);
-};
-
-TCompactProtocol.prototype.writeListEnd = function () {
-};
-
-/**
- * Writes a set collection header
- * @param {number} elemType - The Thrift type of the set elements.
- * @param {number} size - The number of elements in the set.
- */
-TCompactProtocol.prototype.writeSetBegin = function (elemType, size) {
-  this.writeCollectionBegin(elemType, size);
-};
-
-TCompactProtocol.prototype.writeSetEnd = function () {
-};
-
-TCompactProtocol.prototype.writeBool = function (value) {
-  if (this.booleanField_.name !== null) {
-    // we haven't written the field header yet
-    this.writeFieldBeginInternal(this.booleanField_.name,
-      this.booleanField_.fieldType,
-      this.booleanField_.fieldId,
-      (value ? TCompactProtocol.Types.CT_BOOLEAN_TRUE
-        : TCompactProtocol.Types.CT_BOOLEAN_FALSE));
-    this.booleanField_.name = null;
-  } else {
-    // we're not part of a field, so just write the value
-    this.writeByte((value ? TCompactProtocol.Types.CT_BOOLEAN_TRUE
-      : TCompactProtocol.Types.CT_BOOLEAN_FALSE));
-  }
-};
-
-TCompactProtocol.prototype.writeByte = function (b) {
-  this.trans.write(new Buffer([b]));
-};
-
-TCompactProtocol.prototype.writeI16 = function (i16) {
-  this.writeVarint32(this.i32ToZigzag(i16));
-};
-
-TCompactProtocol.prototype.writeI32 = function (i32) {
-  this.writeVarint32(this.i32ToZigzag(i32));
-};
-
-TCompactProtocol.prototype.writeI64 = function (i64) {
-  this.writeVarint64(this.i64ToZigzag(i64));
-};
-
-// Little-endian, unlike TBinaryProtocol
-TCompactProtocol.prototype.writeDouble = function (v) {
-  var buff = new Buffer(8);
-  var m, e, c;
-
-  buff[7] = (v < 0 ? 0x80 : 0x00);
-
-  v = Math.abs(v);
-  if (v !== v) {
-    // NaN, use QNaN IEEE format
-    m = 2251799813685248;
-    e = 2047;
-  } else if (v === Infinity) {
-    m = 0;
-    e = 2047;
-  } else {
-    e = Math.floor(Math.log(v) / Math.LN2);
-    c = Math.pow(2, -e);
-    if (v * c < 1) {
-      e--;
-      c *= 2;
+  writeBool(value: any) {
+    if (this.booleanField_.name !== null) {
+      // we haven't written the field header yet
+      this.writeFieldBeginInternal(this.booleanField_.name,
+        this.booleanField_.fieldType,
+        this.booleanField_.fieldId,
+        (value ? TCompactProtocolTypes.CT_BOOLEAN_TRUE
+          : TCompactProtocolTypes.CT_BOOLEAN_FALSE));
+      this.booleanField_.name = null;
+    } else {
+      // we're not part of a field, so just write the value
+      this.writeByte((value ? TCompactProtocolTypes.CT_BOOLEAN_TRUE
+        : TCompactProtocolTypes.CT_BOOLEAN_FALSE));
     }
+  };
 
-    if (e + 1023 >= 2047) {
-      // Overflow
+  writeByte(b: any) {
+    this.trans.write(new Buffer([b]));
+  };
+
+  writeI16(i16: any) {
+    this.writeVarint32(this.i32ToZigzag(i16));
+  };
+
+  writeI32(i32: any) {
+    this.writeVarint32(this.i32ToZigzag(i32));
+  };
+
+  writeI64(i64: any) {
+    this.writeVarint64(this.i64ToZigzag(i64));
+  };
+
+  // Little-endian, unlike TBinaryProtocol
+  writeDouble(v: any) {
+    var buff = new Buffer(8);
+    var m, e, c;
+
+    buff[7] = (v < 0 ? 0x80 : 0x00);
+
+    v = Math.abs(v);
+    if (v !== v) {
+      // NaN, use QNaN IEEE format
+      m = 2251799813685248;
+      e = 2047;
+    } else if (v === Infinity) {
       m = 0;
       e = 2047;
-    }
-    else if (e + 1023 >= 1) {
-      // Normalized - term order matters, as Math.pow(2, 52-e) and v*Math.pow(2, 52) can overflow
-      m = (v * c - 1) * POW_52;
-      e += 1023;
-    }
-    else {
-      // Denormalized - also catches the '0' case, somewhat by chance
-      m = (v * POW_1022) * POW_52;
-      e = 0;
-    }
-  }
-
-  buff[6] = (e << 4) & 0xf0;
-  buff[7] |= (e >> 4) & 0x7f;
-
-  buff[0] = m & 0xff;
-  m = Math.floor(m / POW_8);
-  buff[1] = m & 0xff;
-  m = Math.floor(m / POW_8);
-  buff[2] = m & 0xff;
-  m = Math.floor(m / POW_8);
-  buff[3] = m & 0xff;
-  m >>= 8;
-  buff[4] = m & 0xff;
-  m >>= 8;
-  buff[5] = m & 0xff;
-  m >>= 8;
-  buff[6] |= m & 0x0f;
-
-  this.trans.write(buff);
-};
-
-TCompactProtocol.prototype.writeStringOrBinary = function (name, encoding, arg) {
-  if (typeof arg === 'string') {
-    this.writeVarint32(Buffer.byteLength(arg, encoding));
-    this.trans.write(new Buffer(arg, encoding));
-  } else if (arg instanceof Buffer ||
-    Object.prototype.toString.call(arg) == '[object Uint8Array]') {
-    // Buffers in Node.js under Browserify may extend UInt8Array instead of
-    // defining a new object. We detect them here so we can write them
-    // correctly
-    this.writeVarint32(arg.length);
-    this.trans.write(arg);
-  } else {
-    throw new Error(name + ' called without a string/Buffer argument: ' + arg);
-  }
-};
-
-TCompactProtocol.prototype.writeString = function (arg) {
-  this.writeStringOrBinary('writeString', 'utf8', arg);
-};
-
-TCompactProtocol.prototype.writeBinary = function (arg) {
-  this.writeStringOrBinary('writeBinary', 'binary', arg);
-};
-
-
-//
-// Compact Protocol internal write methods
-//
-
-TCompactProtocol.prototype.writeFieldBeginInternal = function (name,
-  fieldType,
-  fieldId,
-  typeOverride) {
-  //If there's a type override, use that.
-  var typeToWrite = (typeOverride == -1 ? this.getCompactType(fieldType) : typeOverride);
-  //Check if we can delta encode the field id
-  if (fieldId > this.lastFieldId_ && fieldId - this.lastFieldId_ <= 15) {
-    //Include the type delta with the field ID
-    this.writeByte((fieldId - this.lastFieldId_) << 4 | typeToWrite);
-  } else {
-    //Write separate type and ID values
-    this.writeByte(typeToWrite);
-    this.writeI16(fieldId);
-  }
-  this.lastFieldId_ = fieldId;
-};
-
-TCompactProtocol.prototype.writeCollectionBegin = function (elemType, size) {
-  if (size <= 14) {
-    //Combine size and type in one byte if possible
-    this.writeByte(size << 4 | this.getCompactType(elemType));
-  } else {
-    this.writeByte(0xf0 | this.getCompactType(elemType));
-    this.writeVarint32(size);
-  }
-};
-
-/**
- * Write an i32 as a varint. Results in 1-5 bytes on the wire.
- */
-TCompactProtocol.prototype.writeVarint32 = function (n) {
-  var buf = new Buffer(5);
-  var wsize = 0;
-  while (true) {
-    if ((n & ~0x7F) === 0) {
-      buf[wsize++] = n;
-      break;
     } else {
-      buf[wsize++] = ((n & 0x7F) | 0x80);
-      n = n >>> 7;
+      e = Math.floor(Math.log(v) / Math.LN2);
+      c = Math.pow(2, -e);
+      if (v * c < 1) {
+        e--;
+        c *= 2;
+      }
+
+      if (e + 1023 >= 2047) {
+        // Overflow
+        m = 0;
+        e = 2047;
+      }
+      else if (e + 1023 >= 1) {
+        // Normalized - term order matters, as Math.pow(2, 52-e) and v*Math.pow(2, 52) can overflow
+        m = (v * c - 1) * POW_52;
+        e += 1023;
+      }
+      else {
+        // Denormalized - also catches the '0' case, somewhat by chance
+        m = (v * POW_1022) * POW_52;
+        e = 0;
+      }
     }
-  }
-  var wbuf = new Buffer(wsize);
-  buf.copy(wbuf, 0, 0, wsize);
-  this.trans.write(wbuf);
-};
 
-/**
- * Write an i64 as a varint. Results in 1-10 bytes on the wire.
- * N.B. node-int64 is always big endian
- */
-TCompactProtocol.prototype.writeVarint64 = function (n) {
-  if (typeof n === "number") {
-    n = new Int64(n);
-  }
-  if (!(n instanceof Int64)) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Expected Int64 or Number, found: " + n);
-  }
+    buff[6] = (e << 4) & 0xf0;
+    buff[7] |= (e >> 4) & 0x7f;
 
-  var buf = new Buffer(10);
-  var wsize = 0;
-  var hi = n.buffer.readUInt32BE(0, true);
-  var lo = n.buffer.readUInt32BE(4, true);
-  var mask = 0;
-  while (true) {
-    if (((lo & ~0x7F) === 0) && (hi === 0)) {
-      buf[wsize++] = lo;
-      break;
+    buff[0] = m & 0xff;
+    m = Math.floor(m / POW_8);
+    buff[1] = m & 0xff;
+    m = Math.floor(m / POW_8);
+    buff[2] = m & 0xff;
+    m = Math.floor(m / POW_8);
+    buff[3] = m & 0xff;
+    m >>= 8;
+    buff[4] = m & 0xff;
+    m >>= 8;
+    buff[5] = m & 0xff;
+    m >>= 8;
+    buff[6] |= m & 0x0f;
+
+    this.trans.write(buff);
+  };
+
+  writeStringOrBinary(name: any, encoding: any, arg: any) {
+    if (typeof arg === 'string') {
+      this.writeVarint32(Buffer.byteLength(arg, encoding));
+      this.trans.write(new Buffer(arg, encoding));
+    } else if (arg instanceof Buffer ||
+      Object.prototype.toString.call(arg) == '[object Uint8Array]') {
+      // Buffers in Node.js under Browserify may extend UInt8Array instead of
+      // defining a new object. We detect them here so we can write them
+      // correctly
+      this.writeVarint32(arg.length);
+      this.trans.write(arg);
     } else {
-      buf[wsize++] = ((lo & 0x7F) | 0x80);
-      mask = hi << 25;
-      lo = lo >>> 7;
-      hi = hi >>> 7;
-      lo = lo | mask;
+      throw new Error(name + ' called without a string/Buffer argument: ' + arg);
     }
-  }
-  var wbuf = new Buffer(wsize);
-  buf.copy(wbuf, 0, 0, wsize);
-  this.trans.write(wbuf);
-};
+  };
 
-/**
- * Convert l into a zigzag long. This allows negative numbers to be
- * represented compactly as a varint.
- */
-TCompactProtocol.prototype.i64ToZigzag = function (l) {
-  if (typeof l === 'string') {
-    l = new Int64(parseInt(l, 10));
-  } else if (typeof l === 'number') {
-    l = new Int64(l);
-  }
-  if (!(l instanceof Int64)) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Expected Int64 or Number, found: " + l);
-  }
-  var hi = l.buffer.readUInt32BE(0, true);
-  var lo = l.buffer.readUInt32BE(4, true);
-  var sign = hi >>> 31;
-  hi = ((hi << 1) | (lo >>> 31)) ^ ((!!sign) ? 0xFFFFFFFF : 0);
-  lo = (lo << 1) ^ ((!!sign) ? 0xFFFFFFFF : 0);
-  return new Int64(hi, lo);
-};
+  writeString(arg: any) {
+    this.writeStringOrBinary('writeString', 'utf8', arg);
+  };
 
-/**
- * Convert n into a zigzag int. This allows negative numbers to be
- * represented compactly as a varint.
- */
-TCompactProtocol.prototype.i32ToZigzag = function (n) {
-  return (n << 1) ^ ((n & 0x80000000) ? 0xFFFFFFFF : 0);
-};
+  writeBinary(arg: any) {
+    this.writeStringOrBinary('writeBinary', 'binary', arg);
+  };
 
+  //
+  // Compact Protocol internal write methods
+  //
 
-//
-// Compact Protocol read operations
-//
-
-TCompactProtocol.prototype.readMessageBegin = function () {
-  //Read protocol ID
-  var protocolId = this.trans.readByte();
-  if (protocolId != TCompactProtocol.PROTOCOL_ID) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.BAD_VERSION, "Bad protocol identifier " + protocolId);
-  }
-
-  //Read Version and Type
-  var versionAndType = this.trans.readByte();
-  var version = (versionAndType & TCompactProtocol.VERSION_MASK);
-  if (version != TCompactProtocol.VERSION_N) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.BAD_VERSION, "Bad protocol version " + version);
-  }
-  var type = ((versionAndType >> TCompactProtocol.TYPE_SHIFT_AMOUNT) & TCompactProtocol.TYPE_BITS);
-
-  //Read SeqId
-  var seqid = this.readVarint32();
-
-  //Read name
-  var name = this.readString();
-
-  return { fname: name, mtype: type, rseqid: seqid };
-};
-
-TCompactProtocol.prototype.readMessageEnd = function () {
-};
-
-TCompactProtocol.prototype.readStructBegin = function () {
-  this.lastField_.push(this.lastFieldId_);
-  this.lastFieldId_ = 0;
-  return { fname: '' };
-};
-
-TCompactProtocol.prototype.readStructEnd = function () {
-  this.lastFieldId_ = this.lastField_.pop();
-};
-
-TCompactProtocol.prototype.readFieldBegin = function () {
-  var fieldId = 0;
-  var b = this.trans.readByte(b);
-  var type = (b & 0x0f);
-
-  if (type == TCompactProtocol.Types.CT_STOP) {
-    return { fname: null, ftype: Thrift.Type.STOP, fid: 0 };
-  }
-
-  //Mask off the 4 MSB of the type header to check for field id delta.
-  var modifier = ((b & 0x000000f0) >>> 4);
-  if (modifier === 0) {
-    //If not a delta read the field id.
-    fieldId = this.readI16();
-  } else {
-    //Recover the field id from the delta
-    fieldId = (this.lastFieldId_ + modifier);
-  }
-  var fieldType = this.getTType(type);
-
-  //Boolean are encoded with the type
-  if (type == TCompactProtocol.Types.CT_BOOLEAN_TRUE ||
-    type == TCompactProtocol.Types.CT_BOOLEAN_FALSE) {
-    this.boolValue_.hasBoolValue = true;
-    this.boolValue_.boolValue =
-      (type == TCompactProtocol.Types.CT_BOOLEAN_TRUE ? true : false);
-  }
-
-  //Save the new field for the next delta computation.
-  this.lastFieldId_ = fieldId;
-  return { fname: null, ftype: fieldType, fid: fieldId };
-};
-
-TCompactProtocol.prototype.readFieldEnd = function () {
-};
-
-TCompactProtocol.prototype.readMapBegin = function () {
-  var msize = this.readVarint32();
-  if (msize < 0) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative map size");
-  }
-
-  var kvType = 0;
-  if (msize !== 0) {
-    kvType = this.trans.readByte();
-  }
-
-  var keyType = this.getTType((kvType & 0xf0) >>> 4);
-  var valType = this.getTType(kvType & 0xf);
-  return { ktype: keyType, vtype: valType, size: msize };
-};
-
-TCompactProtocol.prototype.readMapEnd = function () {
-};
-
-TCompactProtocol.prototype.readListBegin = function () {
-  var size_and_type = this.trans.readByte();
-
-  var lsize = (size_and_type >>> 4) & 0x0000000f;
-  if (lsize == 15) {
-    lsize = this.readVarint32();
-  }
-
-  if (lsize < 0) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative list size");
-  }
-
-  var elemType = this.getTType(size_and_type & 0x0000000f);
-
-  return { etype: elemType, size: lsize };
-};
-
-TCompactProtocol.prototype.readListEnd = function () {
-};
-
-TCompactProtocol.prototype.readSetBegin = function () {
-  return this.readListBegin();
-};
-
-TCompactProtocol.prototype.readSetEnd = function () {
-};
-
-TCompactProtocol.prototype.readBool = function () {
-  var value = false;
-  var rsize = 0;
-  if (this.boolValue_.hasBoolValue === true) {
-    value = this.boolValue_.boolValue;
-    this.boolValue_.hasBoolValue = false;
-  } else {
-    var res = this.trans.readByte();
-    rsize = res.rsize;
-    value = (res.value == TCompactProtocol.Types.CT_BOOLEAN_TRUE);
-  }
-  return value;
-};
-
-TCompactProtocol.prototype.readByte = function () {
-  return this.trans.readByte();
-};
-
-TCompactProtocol.prototype.readI16 = function () {
-  return this.readI32();
-};
-
-TCompactProtocol.prototype.readI32 = function () {
-  return this.zigzagToI32(this.readVarint32());
-};
-
-TCompactProtocol.prototype.readI64 = function () {
-  return this.zigzagToI64(this.readVarint64());
-};
-
-// Little-endian, unlike TBinaryProtocol
-TCompactProtocol.prototype.readDouble = function () {
-  var buff = this.trans.read(8);
-  var off = 0;
-
-  var signed = buff[off + 7] & 0x80;
-  var e = (buff[off + 6] & 0xF0) >> 4;
-  e += (buff[off + 7] & 0x7F) << 4;
-
-  var m = buff[off];
-  m += buff[off + 1] << 8;
-  m += buff[off + 2] << 16;
-  m += buff[off + 3] * POW_24;
-  m += buff[off + 4] * POW_32;
-  m += buff[off + 5] * POW_40;
-  m += (buff[off + 6] & 0x0F) * POW_48;
-
-  switch (e) {
-    case 0:
-      e = -1022;
-      break;
-    case 2047:
-      return m ? NaN : (signed ? -Infinity : Infinity);
-    default:
-      m += POW_52;
-      e -= 1023;
-  }
-
-  if (signed) {
-    m *= -1;
-  }
-
-  return m * Math.pow(2, e - 52);
-};
-
-TCompactProtocol.prototype.readBinary = function () {
-  var size = this.readVarint32();
-  if (size === 0) {
-    return new Buffer(0);
-  }
-
-  if (size < 0) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative binary size");
-  }
-  return this.trans.read(size);
-};
-
-TCompactProtocol.prototype.readString = function () {
-  var size = this.readVarint32();
-  // Catch empty string case
-  if (size === 0) {
-    return "";
-  }
-
-  // Catch error cases
-  if (size < 0) {
-    throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative string size");
-  }
-  return this.trans.readString(size);
-};
-
-
-//
-// Compact Protocol internal read operations
-//
-
-/**
- * Read an i32 from the wire as a varint. The MSB of each byte is set
- * if there is another byte to follow. This can read up to 5 bytes.
- */
-TCompactProtocol.prototype.readVarint32 = function () {
-  return this.readVarint64().toNumber();
-};
-
-/**
- * Read an i64 from the wire as a proper varint. The MSB of each byte is set
- * if there is another byte to follow. This can read up to 10 bytes.
- */
-TCompactProtocol.prototype.readVarint64 = function () {
-  var rsize = 0;
-  var lo = 0;
-  var hi = 0;
-  var shift = 0;
-  while (true) {
-    var b = this.trans.readByte();
-    rsize++;
-    if (shift <= 25) {
-      lo = lo | ((b & 0x7f) << shift);
-    } else if (25 < shift && shift < 32) {
-      lo = lo | ((b & 0x7f) << shift);
-      hi = hi | ((b & 0x7f) >>> (32 - shift));
+  writeFieldBeginInternal(
+    name: any,
+    fieldType: any,
+    fieldId: any,
+    typeOverride: any
+  ) {
+    //If there's a type override, use that.
+    var typeToWrite = (typeOverride == -1 ? this.getCompactType(fieldType) : typeOverride);
+    //Check if we can delta encode the field id
+    if (fieldId > this.lastFieldId_ && fieldId - this.lastFieldId_ <= 15) {
+      //Include the type delta with the field ID
+      this.writeByte((fieldId - this.lastFieldId_) << 4 | typeToWrite);
     } else {
-      hi = hi | ((b & 0x7f) << (shift - 32));
+      //Write separate type and ID values
+      this.writeByte(typeToWrite);
+      this.writeI16(fieldId);
     }
-    shift += 7;
-    if (!(b & 0x80)) {
-      break;
+    this.lastFieldId_ = fieldId;
+  };
+
+  writeCollectionBegin(elemType: any, size: number) {
+    if (size <= 14) {
+      //Combine size and type in one byte if possible
+      this.writeByte(size << 4 | this.getCompactType(elemType));
+    } else {
+      this.writeByte(0xf0 | this.getCompactType(elemType));
+      this.writeVarint32(size);
     }
-    if (rsize >= 10) {
-      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Variable-length int over 10 bytes.");
+  };
+
+  /**
+   * Write an i32 as a varint. Results in 1-5 bytes on the wire.
+   */
+  writeVarint32(n: any) {
+    var buf = new Buffer(5);
+    var wsize = 0;
+    while (true) {
+      if ((n & ~0x7F) === 0) {
+        buf[wsize++] = n;
+        break;
+      } else {
+        buf[wsize++] = ((n & 0x7F) | 0x80);
+        n = n >>> 7;
+      }
     }
-  }
-  return new Int64(hi, lo);
-};
+    var wbuf = new Buffer(wsize);
+    buf.copy(wbuf, 0, 0, wsize);
+    this.trans.write(wbuf);
+  };
 
-/**
- * Convert from zigzag int to int.
- */
-TCompactProtocol.prototype.zigzagToI32 = function (n) {
-  return (n >>> 1) ^ (-1 * (n & 1));
-};
 
-/**
- * Convert from zigzag long to long.
- */
-TCompactProtocol.prototype.zigzagToI64 = function (n) {
-  var hi = n.buffer.readUInt32BE(0, true);
-  var lo = n.buffer.readUInt32BE(4, true);
+  /**
+   * Write an i64 as a varint. Results in 1-10 bytes on the wire.
+   * N.B. node-int64 is always big endian
+   */
+  writeVarint64(n: any) {
+    if (typeof n === "number") {
+      n = new Int64(n);
+    }
+    if (!(n instanceof Int64)) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Expected Int64 or Number, found: " + n);
+    }
 
-  var neg = new Int64(hi & 0, lo & 1);
-  neg._2scomp();
-  var hi_neg = neg.buffer.readUInt32BE(0, true);
-  var lo_neg = neg.buffer.readUInt32BE(4, true);
+    var buf = new Buffer(10);
+    var wsize = 0;
+    var hi = n.buffer.readUInt32BE(0, true);
+    var lo = n.buffer.readUInt32BE(4, true);
+    var mask = 0;
+    while (true) {
+      if (((lo & ~0x7F) === 0) && (hi === 0)) {
+        buf[wsize++] = lo;
+        break;
+      } else {
+        buf[wsize++] = ((lo & 0x7F) | 0x80);
+        mask = hi << 25;
+        lo = lo >>> 7;
+        hi = hi >>> 7;
+        lo = lo | mask;
+      }
+    }
+    var wbuf = new Buffer(wsize);
+    buf.copy(wbuf, 0, 0, wsize);
+    this.trans.write(wbuf);
+  };
 
-  var hi_lo = (hi << 31);
-  hi = (hi >>> 1) ^ (hi_neg);
-  lo = ((lo >>> 1) | hi_lo) ^ (lo_neg);
-  return new Int64(hi, lo);
-};
+  /**
+   * Convert l into a zigzag long. This allows negative numbers to be
+   * represented compactly as a varint.
+   */
+  i64ToZigzag(l: any) {
+    if (typeof l === 'string') {
+      l = new Int64(parseInt(l, 10));
+    } else if (typeof l === 'number') {
+      l = new Int64(l);
+    }
+    if (!(l instanceof Int64)) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Expected Int64 or Number, found: " + l);
+    }
+    var hi = l.buffer.readUInt32BE(0, true);
+    var lo = l.buffer.readUInt32BE(4, true);
+    var sign = hi >>> 31;
+    hi = ((hi << 1) | (lo >>> 31)) ^ ((!!sign) ? 0xFFFFFFFF : 0);
+    lo = (lo << 1) ^ ((!!sign) ? 0xFFFFFFFF : 0);
+    return new Int64(hi, lo);
+  };
 
-TCompactProtocol.prototype.skip = function (type) {
-  switch (type) {
-    case ThriftType.STOP:
-      return;
-    case ThriftType.BOOL:
-      this.readBool();
-      break;
-    case ThriftType.BYTE:
-      this.readByte();
-      break;
-    case ThriftType.I16:
-      this.readI16();
-      break;
-    case ThriftType.I32:
-      this.readI32();
-      break;
-    case ThriftType.I64:
-      this.readI64();
-      break;
-    case ThriftType.DOUBLE:
-      this.readDouble();
-      break;
-    case ThriftType.STRING:
-      this.readString();
-      break;
-    case ThriftType.STRUCT:
-      this.readStructBegin();
-      while (true) {
-        var r = this.readFieldBegin();
-        if (r.ftype === ThriftType.STOP) {
-          break;
+  /**
+   * Convert n into a zigzag int. This allows negative numbers to be
+   * represented compactly as a varint.
+   */
+  i32ToZigzag(n: any) {
+    return (n << 1) ^ ((n & 0x80000000) ? 0xFFFFFFFF : 0);
+  };
+
+  //
+  // Compact Protocol read operations
+  //
+
+  readMessageBegin() {
+    //Read protocol ID
+    var protocolId = this.trans.readByte();
+    if (protocolId != TCompactProtocol.PROTOCOL_ID) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.BAD_VERSION, "Bad protocol identifier " + protocolId);
+    }
+
+    //Read Version and Type
+    var versionAndType = this.trans.readByte();
+    var version = (versionAndType & TCompactProtocol.VERSION_MASK);
+    if (version != TCompactProtocol.VERSION_N) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.BAD_VERSION, "Bad protocol version " + version);
+    }
+    var type = ((versionAndType >> TCompactProtocol.TYPE_SHIFT_AMOUNT) & TCompactProtocol.TYPE_BITS);
+
+    //Read SeqId
+    var seqid = this.readVarint32();
+
+    //Read name
+    var name = this.readString();
+
+    return { fname: name, mtype: type, rseqid: seqid };
+  };
+
+  readMessageEnd() {
+  };
+
+  readStructBegin() {
+    this.lastField_.push(this.lastFieldId_);
+    this.lastFieldId_ = 0;
+    return { fname: '' };
+  };
+
+  readStructEnd() {
+    this.lastFieldId_ = this.lastField_.pop() as number;
+  };
+
+  readFieldBegin() {
+    var fieldId = 0;
+    var b: any = this.trans.readByte(b);
+    var type = (b & 0x0f);
+
+    if (type == TCompactProtocolTypes.CT_STOP) {
+      return { fname: null, ftype: Thrift.Type.STOP, fid: 0 };
+    }
+
+    //Mask off the 4 MSB of the type header to check for field id delta.
+    var modifier = ((b & 0x000000f0) >>> 4);
+    if (modifier === 0) {
+      //If not a delta read the field id.
+      fieldId = this.readI16();
+    } else {
+      //Recover the field id from the delta
+      fieldId = (this.lastFieldId_ + modifier);
+    }
+    var fieldType = this.getTType(type);
+
+    //Boolean are encoded with the type
+    if (type == TCompactProtocolTypes.CT_BOOLEAN_TRUE ||
+      type == TCompactProtocolTypes.CT_BOOLEAN_FALSE) {
+      this.boolValue_.hasBoolValue = true;
+      this.boolValue_.boolValue =
+        (type == TCompactProtocolTypes.CT_BOOLEAN_TRUE ? true : false);
+    }
+
+    //Save the new field for the next delta computation.
+    this.lastFieldId_ = fieldId;
+    return { fname: null, ftype: fieldType, fid: fieldId };
+  };
+
+  readFieldEnd() {
+  };
+
+  readMapBegin() {
+    var msize = this.readVarint32();
+    if (msize < 0) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative map size");
+    }
+
+    var kvType = 0;
+    if (msize !== 0) {
+      kvType = this.trans.readByte();
+    }
+
+    var keyType = this.getTType((kvType & 0xf0) >>> 4);
+    var valType = this.getTType(kvType & 0xf);
+    return { ktype: keyType, vtype: valType, size: msize };
+  };
+  readMapEnd() {
+  };
+
+  readListBegin() {
+    var size_and_type = this.trans.readByte();
+
+    var lsize = (size_and_type >>> 4) & 0x0000000f;
+    if (lsize == 15) {
+      lsize = this.readVarint32();
+    }
+
+    if (lsize < 0) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative list size");
+    }
+
+    var elemType = this.getTType(size_and_type & 0x0000000f);
+
+    return { etype: elemType, size: lsize };
+  };
+  readListEnd() {
+  };
+
+  readSetBegin() {
+    return this.readListBegin();
+  };
+  readSetEnd() {
+  };
+
+  readBool() {
+    var value = false;
+    var rsize = 0;
+    if (this.boolValue_.hasBoolValue === true) {
+      value = this.boolValue_.boolValue;
+      this.boolValue_.hasBoolValue = false;
+    } else {
+      var res = this.trans.readByte();
+      rsize = res.rsize;
+      value = (res.value == TCompactProtocolTypes.CT_BOOLEAN_TRUE);
+    }
+    return value;
+  };
+
+  readByte() {
+    return this.trans.readByte();
+  };
+
+  readI16() {
+    return this.readI32();
+  };
+
+  readI32() {
+    return this.zigzagToI32(this.readVarint32());
+  };
+
+  readI64() {
+    return this.zigzagToI64(this.readVarint64());
+  };
+
+  // Little-endian, unlike TBinaryProtocol
+  readDouble() {
+    var buff = this.trans.read(8);
+    var off = 0;
+
+    var signed = buff[off + 7] & 0x80;
+    var e = (buff[off + 6] & 0xF0) >> 4;
+    e += (buff[off + 7] & 0x7F) << 4;
+
+    var m = buff[off];
+    m += buff[off + 1] << 8;
+    m += buff[off + 2] << 16;
+    m += buff[off + 3] * POW_24;
+    m += buff[off + 4] * POW_32;
+    m += buff[off + 5] * POW_40;
+    m += (buff[off + 6] & 0x0F) * POW_48;
+
+    switch (e) {
+      case 0:
+        e = -1022;
+        break;
+      case 2047:
+        return m ? NaN : (signed ? -Infinity : Infinity);
+      default:
+        m += POW_52;
+        e -= 1023;
+    }
+
+    if (signed) {
+      m *= -1;
+    }
+
+    return m * Math.pow(2, e - 52);
+  };
+
+  readBinary() {
+    var size = this.readVarint32();
+    if (size === 0) {
+      return new Buffer(0);
+    }
+
+    if (size < 0) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative binary size");
+    }
+    return this.trans.read(size);
+  };
+
+  readString() {
+    var size = this.readVarint32();
+    // Catch empty string case
+    if (size === 0) {
+      return "";
+    }
+
+    // Catch error cases
+    if (size < 0) {
+      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative string size");
+    }
+    return this.trans.readString(size);
+  };
+
+
+  //
+  // Compact Protocol internal read operations
+  //
+
+  /**
+   * Read an i32 from the wire as a varint. The MSB of each byte is set
+   * if there is another byte to follow. This can read up to 5 bytes.
+   */
+  readVarint32() {
+    return this.readVarint64().toNumber();
+  };
+
+  /**
+   * Read an i64 from the wire as a proper varint. The MSB of each byte is set
+   * if there is another byte to follow. This can read up to 10 bytes.
+   */
+  readVarint64() {
+    var rsize = 0;
+    var lo = 0;
+    var hi = 0;
+    var shift = 0;
+    while (true) {
+      var b = this.trans.readByte();
+      rsize++;
+      if (shift <= 25) {
+        lo = lo | ((b & 0x7f) << shift);
+      } else if (25 < shift && shift < 32) {
+        lo = lo | ((b & 0x7f) << shift);
+        hi = hi | ((b & 0x7f) >>> (32 - shift));
+      } else {
+        hi = hi | ((b & 0x7f) << (shift - 32));
+      }
+      shift += 7;
+      if (!(b & 0x80)) {
+        break;
+      }
+      if (rsize >= 10) {
+        throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Variable-length int over 10 bytes.");
+      }
+    }
+    return new Int64(hi, lo);
+  };
+
+  /**
+   * Convert from zigzag int to int.
+   */
+  zigzagToI32(n: any) {
+    return (n >>> 1) ^ (-1 * (n & 1));
+  };
+
+  /**
+   * Convert from zigzag long to long.
+   */
+  zigzagToI64(n: any) {
+    var hi = n.buffer.readUInt32BE(0, true);
+    var lo = n.buffer.readUInt32BE(4, true);
+
+    var neg = new Int64(hi & 0, lo & 1);
+    neg._2scomp();
+    var hi_neg = neg.buffer.readUInt32BE(0, true);
+    var lo_neg = neg.buffer.readUInt32BE(4, true);
+
+    var hi_lo = (hi << 31);
+    hi = (hi >>> 1) ^ (hi_neg);
+    lo = ((lo >>> 1) | hi_lo) ^ (lo_neg);
+    return new Int64(hi, lo);
+  };
+
+  skip(type: ThriftType) {
+    switch (type) {
+      case ThriftType.STOP:
+        return;
+      case ThriftType.BOOL:
+        this.readBool();
+        break;
+      case ThriftType.BYTE:
+        this.readByte();
+        break;
+      case ThriftType.I16:
+        this.readI16();
+        break;
+      case ThriftType.I32:
+        this.readI32();
+        break;
+      case ThriftType.I64:
+        this.readI64();
+        break;
+      case ThriftType.DOUBLE:
+        this.readDouble();
+        break;
+      case ThriftType.STRING:
+        this.readString();
+        break;
+      case ThriftType.STRUCT:
+        this.readStructBegin();
+        while (true) {
+          var r = this.readFieldBegin();
+          if (r.ftype === ThriftType.STOP) {
+            break;
+          }
+          this.skip(r.ftype);
+          this.readFieldEnd();
         }
-        this.skip(r.ftype);
-        this.readFieldEnd();
-      }
-      this.readStructEnd();
-      break;
-    case ThriftType.MAP:
-      var mapBegin = this.readMapBegin();
-      for (var i = 0; i < mapBegin.size; ++i) {
-        this.skip(mapBegin.ktype);
-        this.skip(mapBegin.vtype);
-      }
-      this.readMapEnd();
-      break;
-    case ThriftType.SET:
-      var setBegin = this.readSetBegin();
-      for (var i2 = 0; i2 < setBegin.size; ++i2) {
-        this.skip(setBegin.etype);
-      }
-      this.readSetEnd();
-      break;
-    case ThriftType.LIST:
-      var listBegin = this.readListBegin();
-      for (var i3 = 0; i3 < listBegin.size; ++i3) {
-        this.skip(listBegin.etype);
-      }
-      this.readListEnd();
-      break;
-    default:
-      throw new Error("Invalid type: " + type);
-  }
-};
+        this.readStructEnd();
+        break;
+      case ThriftType.MAP:
+        var mapBegin = this.readMapBegin();
+        for (var i = 0; i < mapBegin.size; ++i) {
+          this.skip(mapBegin.ktype);
+          this.skip(mapBegin.vtype);
+        }
+        this.readMapEnd();
+        break;
+      case ThriftType.SET:
+        var setBegin = this.readSetBegin();
+        for (var i2 = 0; i2 < setBegin.size; ++i2) {
+          this.skip(setBegin.etype);
+        }
+        this.readSetEnd();
+        break;
+      case ThriftType.LIST:
+        var listBegin = this.readListBegin();
+        for (var i3 = 0; i3 < listBegin.size; ++i3) {
+          this.skip(listBegin.etype);
+        }
+        this.readListEnd();
+        break;
+      default:
+        throw new Error("Invalid type: " + type);
+    }
+  };
+
+
+}
