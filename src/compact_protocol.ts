@@ -62,22 +62,24 @@ export const enum TCompactProtocolTypes {
 };
 
 export class TCompactProtocol {
-  public lastField_ = [];
-  public lastFieldId_ = 0;
+  public lastField_: number[] = [];
+  public lastFieldId_: number = 0;
   public string_limit_ = 0;
   public string_buf_ = null;
   public string_buf_size_ = 0;
   public container_limit_ = 0;
   public booleanField_ = {
-    name: null,
-    hasBoolValue: false
+    name: null as any as string,
+    hasBoolValue: false,
+    fieldType: ThriftType.BOOL,
+    fieldId: null as any as number,
   };
   public boolValue_ = {
     hasBoolValue: false,
     boolValue: false
   };
   constructor(
-    public trans?: object
+    public trans: any
   ) { }
 
   /**
@@ -171,94 +173,93 @@ export class TCompactProtocol {
     return ThriftType.STOP;
   };
 
+
+  //
+  // Compact Protocol write operations
+  //
+
+  /**
+   * Send any buffered bytes to the end point.
+   */
+  flush() {
+    return this.trans.flush();
+  };
+
+  private _seqid?: number;
+  /**
+   * Writes an RPC message header
+   * @param name - The method name for the message.
+   * @param type - The type of message (CALL, REPLY, EXCEPTION, ONEWAY).
+   * @param seqid - The call sequence number (if any).
+   */
+  writeMessageBegin(name: string, type: number, seqid: number) {
+    this.writeByte(TCompactProtocol.PROTOCOL_ID);
+    this.writeByte((TCompactProtocol.VERSION_N & TCompactProtocol.VERSION_MASK) |
+      ((type << TCompactProtocol.TYPE_SHIFT_AMOUNT) & TCompactProtocol.TYPE_MASK));
+    this.writeVarint32(seqid);
+    this.writeString(name);
+
+    // Record client seqid to find callback again
+    if (this._seqid) {
+      log.warning('SeqId already set', { 'name': name });
+    } else {
+      this._seqid = seqid;
+      this.trans.setCurrSeqId(seqid);
+    }
+  };
+
+  writeMessageEnd() {
+  };
+  writeStructBegin(name) {
+    this.lastField_.push(this.lastFieldId_);
+    this.lastFieldId_ = 0;
+  };
+  writeStructEnd() {
+    // @ts-ignore
+    this.lastFieldId_ = this.lastField_.pop();
+  };
+
+  /**
+   * Writes a struct field header
+   * @param name - The field name (not written with the compact protocol).
+   * @param type - The field data type (a normal Thrift field Type).
+   * @param id - The IDL field Id.
+   */
+  writeFieldBegin(name: string, type: ThriftType, id: number) {
+    if (type != ThriftType.BOOL) {
+      return this.writeFieldBeginInternal(name, type, id, -1);
+    }
+
+    this.booleanField_.name = name;
+    this.booleanField_.fieldType = type;
+    this.booleanField_.fieldId = id;
+  };
+  writeFieldEnd() {
+  };
+  writeFieldStop() {
+    this.writeByte(TCompactProtocolTypes.CT_STOP);
+  };
+
+  /**
+   * Writes a map collection header
+   * @param keyType - The Thrift type of the map keys.
+   * @param valType - The Thrift type of the map values.
+   * @param size - The number of k/v pairs in the map.
+   */
+  writeMapBegin(keyType: ThriftType, valType: ThriftType, size: number) {
+    if (size === 0) {
+      this.writeByte(0);
+    } else {
+      this.writeVarint32(size);
+      this.writeByte(this.getCompactType(keyType) << 4 | this.getCompactType(valType));
+    }
+  };
+  writeMapEnd() {
+  };
+
 }
 
 
-//
-// Compact Protocol write operations
-//
-
-/**
- * Send any buffered bytes to the end point.
- */
-TCompactProtocol.prototype.flush = function () {
-  return this.trans.flush();
-};
-
-/**
- * Writes an RPC message header
- * @param {string} name - The method name for the message.
- * @param {number} type - The type of message (CALL, REPLY, EXCEPTION, ONEWAY).
- * @param {number} seqid - The call sequence number (if any).
- */
-TCompactProtocol.prototype.writeMessageBegin = function (name, type, seqid) {
-  this.writeByte(TCompactProtocol.PROTOCOL_ID);
-  this.writeByte((TCompactProtocol.VERSION_N & TCompactProtocol.VERSION_MASK) |
-    ((type << TCompactProtocol.TYPE_SHIFT_AMOUNT) & TCompactProtocol.TYPE_MASK));
-  this.writeVarint32(seqid);
-  this.writeString(name);
-
-  // Record client seqid to find callback again
-  if (this._seqid) {
-    log.warning('SeqId already set', { 'name': name });
-  } else {
-    this._seqid = seqid;
-    this.trans.setCurrSeqId(seqid);
-  }
-};
-
-TCompactProtocol.prototype.writeMessageEnd = function () {
-};
-
-TCompactProtocol.prototype.writeStructBegin = function (name) {
-  this.lastField_.push(this.lastFieldId_);
-  this.lastFieldId_ = 0;
-};
-
-TCompactProtocol.prototype.writeStructEnd = function () {
-  this.lastFieldId_ = this.lastField_.pop();
-};
-
-/**
- * Writes a struct field header
- * @param {string} name - The field name (not written with the compact protocol).
- * @param {number} type - The field data type (a normal Thrift field Type).
- * @param {number} id - The IDL field Id.
- */
-TCompactProtocol.prototype.writeFieldBegin = function (name, type, id) {
-  if (type != ThriftType.BOOL) {
-    return this.writeFieldBeginInternal(name, type, id, -1);
-  }
-
-  this.booleanField_.name = name;
-  this.booleanField_.fieldType = type;
-  this.booleanField_.fieldId = id;
-};
-
-TCompactProtocol.prototype.writeFieldEnd = function () {
-};
-
-TCompactProtocol.prototype.writeFieldStop = function () {
-  this.writeByte(TCompactProtocol.Types.CT_STOP);
-};
-
-/**
- * Writes a map collection header
- * @param {number} keyType - The Thrift type of the map keys.
- * @param {number} valType - The Thrift type of the map values.
- * @param {number} size - The number of k/v pairs in the map.
- */
-TCompactProtocol.prototype.writeMapBegin = function (keyType, valType, size) {
-  if (size === 0) {
-    this.writeByte(0);
-  } else {
-    this.writeVarint32(size);
-    this.writeByte(this.getCompactType(keyType) << 4 | this.getCompactType(valType));
-  }
-};
-
-TCompactProtocol.prototype.writeMapEnd = function () {
-};
 
 /**
  * Writes a list collection header
