@@ -1,7 +1,0 @@
-{
-  "compilerOptions": {
-    "target": "esnext",
-    "allowSyntheticDefaultImports": true,
-    "strict": true
-  }
-}
