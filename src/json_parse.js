@@ -1,3 +1,5 @@
+// @ts-check
+
 /*
  * Imported from Douglas Crockford's reference implementation with minimum modification
  * to handle Int64.
@@ -20,7 +22,6 @@
     prototype, push, r, t, text
 */
 
-var Int64 = require('node-int64');
 var Int64Util = require('./int64_util');
 
 var json_parse = module.exports = (function () {
@@ -107,7 +108,7 @@ var json_parse = module.exports = (function () {
             number = +string;
             if (!isFinite(number)) {
                 error("Bad number");
-            } else if (number >= Int64.MAX_INT || number <= Int64.MIN_INT) {
+            } else if (number > Number.MAX_SAFE_INTEGER || number < Number.MIN_SAFE_INTEGER) {
                 // Return raw string for further process in TJSONProtocol
                 return string;
             } else {
