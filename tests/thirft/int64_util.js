@@ -1,0 +1,1 @@
+module.exports = require('thrift/lib/nodejs/lib/thrift/int64_util')
