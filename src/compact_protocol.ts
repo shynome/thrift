@@ -456,32 +456,15 @@ export class TCompactProtocol {
    */
   writeVarint64(n: any) {
     if (typeof n === "number") {
-      n = new Int64(n);
+      n = BigInt(n);
     }
-    if (!(n instanceof Int64)) {
+    if (!(typeof n === 'bigint')) {
       throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Expected Int64 or Number, found: " + n);
     }
 
-    var buf = new Buffer(10);
-    var wsize = 0;
-    var hi = n.buffer.readUInt32BE(0, true);
-    var lo = n.buffer.readUInt32BE(4, true);
-    var mask = 0;
-    while (true) {
-      if (((lo & ~0x7F) === 0) && (hi === 0)) {
-        buf[wsize++] = lo;
-        break;
-      } else {
-        buf[wsize++] = ((lo & 0x7F) | 0x80);
-        mask = hi << 25;
-        lo = lo >>> 7;
-        hi = hi >>> 7;
-        lo = lo | mask;
-      }
-    }
-    var wbuf = new Buffer(wsize);
-    buf.copy(wbuf, 0, 0, wsize);
-    this.trans.write(wbuf);
+    var buf = Buffer.allocUnsafe(8);
+    buf.writeBigInt64LE(n, 0)
+    this.trans.write(buf);
   };
 
   /**
@@ -489,20 +472,7 @@ export class TCompactProtocol {
    * represented compactly as a varint.
    */
   i64ToZigzag(l: any) {
-    if (typeof l === 'string') {
-      l = new Int64(parseInt(l, 10));
-    } else if (typeof l === 'number') {
-      l = new Int64(l);
-    }
-    if (!(l instanceof Int64)) {
-      throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Expected Int64 or Number, found: " + l);
-    }
-    var hi = l.buffer.readUInt32BE(0, true);
-    var lo = l.buffer.readUInt32BE(4, true);
-    var sign = hi >>> 31;
-    hi = ((hi << 1) | (lo >>> 31)) ^ ((!!sign) ? 0xFFFFFFFF : 0);
-    lo = (lo << 1) ^ ((!!sign) ? 0xFFFFFFFF : 0);
-    return new Int64(hi, lo);
+    return BigInt(l);
   };
 
   /**
@@ -597,7 +567,7 @@ export class TCompactProtocol {
     }
 
     var kvType = 0;
-    if (msize !== 0) {
+    if (msize !== 0n) {
       kvType = this.trans.readByte();
     }
 
@@ -611,12 +581,12 @@ export class TCompactProtocol {
   readListBegin() {
     var size_and_type = this.trans.readByte();
 
-    var lsize = (size_and_type >>> 4) & 0x0000000f;
-    if (lsize == 15) {
+    var lsize = BigInt((size_and_type >>> 4) & 0x0000000f);
+    if (lsize == 15n) {
       lsize = this.readVarint32();
     }
 
-    if (lsize < 0) {
+    if (lsize < 0n) {
       throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative list size");
     }
 
@@ -700,7 +670,7 @@ export class TCompactProtocol {
 
   readBinary() {
     var size = this.readVarint32();
-    if (size === 0) {
+    if (size === 0n) {
       return new Buffer(0);
     }
 
@@ -713,7 +683,7 @@ export class TCompactProtocol {
   readString() {
     var size = this.readVarint32();
     // Catch empty string case
-    if (size === 0) {
+    if (size === 0n) {
       return "";
     }
 
@@ -734,7 +704,7 @@ export class TCompactProtocol {
    * if there is another byte to follow. This can read up to 5 bytes.
    */
   readVarint32() {
-    return this.readVarint64().toNumber();
+    return this.readVarint64();
   };
 
   /**
@@ -765,7 +735,7 @@ export class TCompactProtocol {
         throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Variable-length int over 10 bytes.");
       }
     }
-    return new Int64(hi, lo);
+    return BigInt(hi);
   };
 
   /**
@@ -779,18 +749,7 @@ export class TCompactProtocol {
    * Convert from zigzag long to long.
    */
   zigzagToI64(n: any) {
-    var hi = n.buffer.readUInt32BE(0, true);
-    var lo = n.buffer.readUInt32BE(4, true);
-
-    var neg = new Int64(hi & 0, lo & 1);
-    neg._2scomp();
-    var hi_neg = neg.buffer.readUInt32BE(0, true);
-    var lo_neg = neg.buffer.readUInt32BE(4, true);
-
-    var hi_lo = (hi << 31);
-    hi = (hi >>> 1) ^ (hi_neg);
-    lo = ((lo >>> 1) | hi_lo) ^ (lo_neg);
-    return new Int64(hi, lo);
+    return BigInt(n);
   };
 
   skip(type: ThriftType) {
