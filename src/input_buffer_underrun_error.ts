@@ -16,15 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-var util = require("util");
 
-module.exports = InputBufferUnderrunError;
+export class InputBufferUnderrunError extends Error {
+}
 
-function InputBufferUnderrunError(message) {
-  Error.call(this);
-  Error.captureStackTrace(this, this.constructor);
-  this.name = this.constructor.name;
-  this.message = message;
-};
-
-util.inherits(InputBufferUnderrunError, Error);
+export default InputBufferUnderrunError
