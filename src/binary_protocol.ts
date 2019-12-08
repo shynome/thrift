@@ -38,11 +38,11 @@ export class TBinaryProtocol {
   ) {
 
   }
-  _seqid = null;
+  _seqid: number | null = null;
   flush() {
     return this.trans.flush();
   };
-  writeMessageBegin(name, type, seqid) {
+  writeMessageBegin(name: string, type: any, seqid: number) {
     if (this.strictWrite) {
       this.writeI32(VERSION_1 | type);
       this.writeString(name);
@@ -68,13 +68,13 @@ export class TBinaryProtocol {
     }
   };
 
-  writeStructBegin(name) {
+  writeStructBegin(name: string) {
   };
   writeStructEnd() {
   };
 
 
-  writeFieldBegin(name, type, id) {
+  writeFieldBegin(name: string, type: any, id: number) {
     this.writeByte(type);
     this.writeI16(id);
   };
@@ -86,7 +86,7 @@ export class TBinaryProtocol {
     this.writeByte(ThriftType.STOP);
   };
 
-  writeMapBegin(ktype, vtype, size) {
+  writeMapBegin(ktype: any, vtype: any, size: number) {
     this.writeByte(ktype);
     this.writeByte(vtype);
     this.writeI32(size);
@@ -95,7 +95,7 @@ export class TBinaryProtocol {
   writeMapEnd() {
   };
 
-  writeListBegin(etype, size) {
+  writeListBegin(etype: any, size: number) {
     this.writeByte(etype);
     this.writeI32(size);
   };
@@ -103,7 +103,7 @@ export class TBinaryProtocol {
   writeListEnd() {
   };
 
-  writeSetBegin(etype, size) {
+  writeSetBegin(etype: any, size: number) {
     this.writeByte(etype);
     this.writeI32(size);
   };
