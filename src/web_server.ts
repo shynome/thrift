@@ -16,19 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-var http = require('http');
-var https = require('https');
-var url = require("url");
-var path = require("path");
-var fs = require("fs");
-var crypto = require("crypto");
-var log = require('./log');
+import http from 'http';
+import https from 'https';
+import url from "url";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
+import *as log from './log';
 
-var MultiplexedProcessor = require('./multiplexed_processor').MultiplexedProcessor;
+import { MultiplexedProcessor } from './multiplexed_processor';
 
-var TBufferedTransport = require('./buffered_transport');
-var TBinaryProtocol = require('./binary_protocol');
-var InputBufferUnderrunError = require('./input_buffer_underrun_error');
+import TBufferedTransport from './buffered_transport';
+import TBinaryProtocol from './binary_protocol';
+import InputBufferUnderrunError from './input_buffer_underrun_error';
+import { TlsOptions } from 'tls';
 
 // WSFrame constructor and prototype
 /////////////////////////////////////////////////////////////////////
@@ -74,137 +75,142 @@ var InputBufferUnderrunError = require('./input_buffer_underrun_error');
  *    |                     Payload Data continued ...                |
  *    +---------------------------------------------------------------+
  */
+
+export interface WSDecodeResult {
+  /**The decoded data for the first ATRPC message */
+  data: Buffer
+  /**The frame mask */
+  mask: Buffer
+  /**
+   * True if binary (TBinaryProtocol),
+   * False if text(TJSONProtocol)
+   */
+  binEncoding: Boolean
+  /**
+   * Multiple ATRPC messages may be sent in a
+   * single WebSocket frame, this Buffer contains
+   * any bytes remaining to be decoded
+   */
+  nextFrame: Buffer
+  /**True is the message is complete */
+  FIN: Boolean
+}
 var wsFrame = {
   /** Encodes a WebSocket frame
    *
-   * @param {Buffer} data - The raw data to encode
-   * @param {Buffer} mask - The mask to apply when sending to server, null for no mask
-   * @param {Boolean} binEncoding - True for binary encoding, false for text encoding
-   * @returns {Buffer} - The WebSocket frame, ready to send
+   * @param data - The raw data to encode
+   * @param mask - The mask to apply when sending to server, null for no mask
+   * @param binEncoding - True for binary encoding, false for text encoding
+   * @returns - The WebSocket frame, ready to send
    */
-  encode: function(data, mask, binEncoding) {
-      var frame = new Buffer(wsFrame.frameSizeFromData(data, mask));
-      //Byte 0 - FIN & OPCODE
-      frame[0] = wsFrame.fin.FIN +
-          (binEncoding ? wsFrame.frameOpCodes.BIN : wsFrame.frameOpCodes.TEXT);
-      //Byte 1 or 1-3 or 1-9 - MASK FLAG & SIZE
-      var payloadOffset = 2;
-      if (data.length < 0x7E) {
-        frame[1] = data.length + (mask ? wsFrame.mask.TO_SERVER : wsFrame.mask.TO_CLIENT);
-      } else if (data.length < 0xFFFF) {
-        frame[1] = 0x7E + (mask ? wsFrame.mask.TO_SERVER : wsFrame.mask.TO_CLIENT);
-        frame.writeUInt16BE(data.length, 2, true);
-        payloadOffset = 4;
-      } else {
-        frame[1] = 0x7F + (mask ? wsFrame.mask.TO_SERVER : wsFrame.mask.TO_CLIENT);
-        frame.writeUInt32BE(0, 2, true);
-        frame.writeUInt32BE(data.length, 6, true);
-        payloadOffset = 10;
-      }
-      //MASK
-      if (mask) {
-        mask.copy(frame, payloadOffset, 0, 4);
-        payloadOffset += 4;
-      }
-      //Payload
-      data.copy(frame, payloadOffset);
-      if (mask) {
-        wsFrame.applyMask(frame.slice(payloadOffset), frame.slice(payloadOffset-4,payloadOffset));
-      }
-      return frame;
+  encode: function (data: Buffer, mask: Buffer, binEncoding: boolean): Buffer {
+    var frame = new Buffer(wsFrame.frameSizeFromData(data, mask as any));
+    //Byte 0 - FIN & OPCODE
+    frame[0] = wsFrame.fin.FIN +
+      (binEncoding ? wsFrame.frameOpCodes.BIN : wsFrame.frameOpCodes.TEXT);
+    //Byte 1 or 1-3 or 1-9 - MASK FLAG & SIZE
+    var payloadOffset = 2;
+    if (data.length < 0x7E) {
+      frame[1] = data.length + (mask ? wsFrame.mask.TO_SERVER : wsFrame.mask.TO_CLIENT);
+    } else if (data.length < 0xFFFF) {
+      frame[1] = 0x7E + (mask ? wsFrame.mask.TO_SERVER : wsFrame.mask.TO_CLIENT);
+      frame.writeUInt16BE(data.length, 2);
+      payloadOffset = 4;
+    } else {
+      frame[1] = 0x7F + (mask ? wsFrame.mask.TO_SERVER : wsFrame.mask.TO_CLIENT);
+      frame.writeUInt32BE(0, 2);
+      frame.writeUInt32BE(data.length, 6);
+      payloadOffset = 10;
+    }
+    //MASK
+    if (mask) {
+      mask.copy(frame, payloadOffset, 0, 4);
+      payloadOffset += 4;
+    }
+    //Payload
+    data.copy(frame, payloadOffset);
+    if (mask) {
+      wsFrame.applyMask(frame.slice(payloadOffset), frame.slice(payloadOffset - 4, payloadOffset));
+    }
+    return frame;
   },
 
   /**
-   * @class
-   * @name WSDecodeResult
-   * @property {Buffer} data - The decoded data for the first ATRPC message
-   * @property {Buffer} mask - The frame mask
-   * @property {Boolean} binEncoding - True if binary (TBinaryProtocol),
-   *                                   False if text (TJSONProtocol)
-   * @property {Buffer} nextFrame - Multiple ATRPC messages may be sent in a
-   *                                single WebSocket frame, this Buffer contains
-   *                                any bytes remaining to be decoded
-   * @property {Boolean} FIN - True is the message is complete
+   * Decodes a WebSocket frame
+   * @param frame - The raw inbound frame, if this is a continuation frame it must have a mask property with the mask.
+   * @returns - The decoded payload
    */
+  decode: function (frame: Buffer): WSDecodeResult {
+    var result: WSDecodeResult = {
+      data: null as any,
+      mask: null as any,
+      binEncoding: false,
+      nextFrame: null as any,
+      FIN: true
+    };
 
-   /** Decodes a WebSocket frame
-   *
-   * @param {Buffer} frame - The raw inbound frame, if this is a continuation
-   *                         frame it must have a mask property with the mask.
-   * @returns {WSDecodeResult} - The decoded payload
-   *
-   * @see {@link WSDecodeResult}
-   */
-  decode: function(frame) {
-      var result = {
-        data: null,
-        mask: null,
-        binEncoding: false,
-        nextFrame: null,
-        FIN: true
-      };
+    //Byte 0 - FIN & OPCODE
+    if (wsFrame.fin.FIN != (frame[0] & wsFrame.fin.FIN)) {
+      result.FIN = false;
+    }
+    result.binEncoding = (wsFrame.frameOpCodes.BIN == (frame[0] & wsFrame.frameOpCodes.BIN));
+    //Byte 1 or 1-3 or 1-9 - SIZE
+    var lenByte = (frame[1] & 0x0000007F);
+    var len = lenByte;
+    var dataOffset = 2;
+    if (lenByte == 0x7E) {
+      len = frame.readUInt16BE(2);
+      dataOffset = 4;
+    } else if (lenByte == 0x7F) {
+      len = frame.readUInt32BE(6);
+      dataOffset = 10;
+    }
+    //MASK
+    if (wsFrame.mask.TO_SERVER == (frame[1] & wsFrame.mask.TO_SERVER)) {
+      result.mask = new Buffer(4);
+      frame.copy(result.mask, 0, dataOffset, dataOffset + 4);
+      dataOffset += 4;
+    }
+    //Payload
+    result.data = new Buffer(len);
+    frame.copy(result.data, 0, dataOffset, dataOffset + len);
+    if (result.mask) {
+      wsFrame.applyMask(result.data, result.mask);
+    }
+    //Next Frame
+    if (frame.length > dataOffset + len) {
+      result.nextFrame = new Buffer(frame.length - (dataOffset + len));
+      frame.copy(result.nextFrame, 0, dataOffset + len, frame.length);
+    }
+    //Don't forward control frames
+    // @ts-ignore
+    if (frame[0] & wsFrame.frameOpCodes.FINCTRL) {
+      result.data = null as any;
+    }
 
-      //Byte 0 - FIN & OPCODE
-      if (wsFrame.fin.FIN != (frame[0] & wsFrame.fin.FIN)) {
-        result.FIN = false;
-      }
-      result.binEncoding = (wsFrame.frameOpCodes.BIN == (frame[0] & wsFrame.frameOpCodes.BIN));
-      //Byte 1 or 1-3 or 1-9 - SIZE
-      var lenByte = (frame[1] & 0x0000007F);
-      var len = lenByte;
-      var dataOffset = 2;
-      if (lenByte == 0x7E) {
-        len = frame.readUInt16BE(2);
-        dataOffset = 4;
-      } else if (lenByte == 0x7F) {
-        len = frame.readUInt32BE(6);
-        dataOffset = 10;
-      }
-      //MASK
-      if (wsFrame.mask.TO_SERVER == (frame[1] & wsFrame.mask.TO_SERVER)) {
-        result.mask = new Buffer(4);
-        frame.copy(result.mask, 0, dataOffset, dataOffset + 4);
-        dataOffset += 4;
-      }
-      //Payload
-      result.data = new Buffer(len);
-      frame.copy(result.data, 0, dataOffset, dataOffset+len);
-      if (result.mask) {
-        wsFrame.applyMask(result.data, result.mask);
-      }
-      //Next Frame
-      if (frame.length > dataOffset+len) {
-        result.nextFrame = new Buffer(frame.length - (dataOffset+len));
-        frame.copy(result.nextFrame, 0, dataOffset+len, frame.length);
-      }
-      //Don't forward control frames
-      if (frame[0] & wsFrame.frameOpCodes.FINCTRL) {
-        result.data = null;
-      }
-
-      return result;
+    return result;
   },
 
-  /** Masks/Unmasks data
-   *
-   * @param {Buffer} data - data to mask/unmask in place
-   * @param {Buffer} mask - the mask
+  /**
+   * Masks/Unmasks data
+   * @param data - data to mask/unmask in place
+   * @param mask - the mask
    */
-  applyMask: function(data, mask){
+  applyMask: function (data: Buffer, mask: Buffer) {
     //TODO: look into xoring words at a time
     var dataLen = data.length;
     var maskLen = mask.length;
     for (var i = 0; i < dataLen; i++) {
-      data[i] = data[i] ^ mask[i%maskLen];
+      data[i] = data[i] ^ mask[i % maskLen];
     }
   },
 
-  /** Computes frame size on the wire from data to be sent
-   *
-   * @param {Buffer} data - data.length is the assumed payload size
-   * @param {Boolean} mask - true if a mask will be sent (TO_SERVER)
+  /**
+   * Computes frame size on the wire from data to be sent
+   * @param data - data.length is the assumed payload size
+   * @param mask - true if a mask will be sent (TO_SERVER)
    */
-  frameSizeFromData: function(data, mask) {
+  frameSizeFromData: function (data: Buffer, mask: Boolean) {
     var headerSize = 10;
     if (data.length < 0x7E) {
       headerSize = 2;
@@ -215,10 +221,10 @@ var wsFrame = {
   },
 
   frameOpCodes: {
-    CONT:     0x00,
-    TEXT:     0x01,
-    BIN:      0x02,
-    CTRL:     0x80
+    CONT: 0x00,
+    TEXT: 0x01,
+    BIN: 0x02,
+    CTRL: 0x80,
   },
 
   mask: {
@@ -236,45 +242,39 @@ var wsFrame = {
 // createWebServer constructor and options
 /////////////////////////////////////////////////////////////////////
 
-/**
- * @class
- * @name ServerOptions
- * @property {array} cors - Array of CORS origin strings to permit requests from.
- * @property {string} files - Path to serve static files from, if absent or ""
- *                               static file service is disabled.
- * @property {object} headers - An object hash mapping header strings to header value
- *                              strings, these headers are transmitted in response to
- *                              static file GET operations.
- * @property {object} services - An object hash mapping service URI strings
- *                               to ServiceOptions objects
- * @property {object} tls - Node.js TLS options (see: nodejs.org/api/tls.html),
- *                          if not present or null regular http is used,
- *                          at least a key and a cert must be defined to use SSL/TLS
- * @see {@link ServiceOptions}
- */
+export interface ServerOptions {
+  /**Array of CORS origin strings to permit requests from. */
+  cors: { [k: string]: any }
+  /**Path to serve static files from, if absent or "" static file service is disabled. */
+  files: string
+  /**An object hash mapping header strings to header value strings, these headers are transmitted in response to static file GET operations. */
+  headers: { [k: string]: any }
+  /**An object hash mapping service URI strings to ServiceOptions objects */
+  services: any
+  /**Node.js TLS options (see: nodejs.org/api/tls.html), if not present or null regular http is used, at least a key and a cert must be defined to use SSL/TLS */
+  tls: TlsOptions
+}
 
-/**
- * @class
- * @name ServiceOptions
- * @property {object} transport - The layered transport to use (defaults
- *                                to TBufferedTransport).
- * @property {object} protocol - The serialization Protocol to use (defaults to
- *                               TBinaryProtocol).
- * @property {object} processor - The Thrift Service class/processor generated
- *                                by the IDL Compiler for the service (the "cls"
- *                                key can also be used for this attribute).
- * @property {object} handler - The handler methods for the Thrift Service.
- */
+export interface ServiceOptions {
+  /**The layered transport to use (defaults to TBufferedTransport). */
+  transport: object
+  /**The serialization Protocol to use (defaults to TBinaryProtocol). */
+  protocol: object
+  /**The Thrift Service class/processor generated by the IDL Compiler for the service (the "cls" key can also be used for this attribute). */
+  processor: object
+  /**The handler methods for the Thrift Service. */
+  handler: object
+}
 
 /**
  * Create a Thrift server which can serve static files and/or one or
  * more Thrift Services.
- * @param {ServerOptions} options - The server configuration.
- * @returns {object} - The Apache Thrift Web Server.
+ * @param options - The server configuration.
+ * @returns - The Apache Thrift Web Server.
  */
-exports.createWebServer = function(options) {
+exports.createWebServer = function (options: ServerOptions): any {
   var baseDir = options.files;
-  var contentTypesByExtension = {
+  var contentTypesByExtension: { [k: string]: string } = {
     '.txt': 'text/plain',
     '.html': 'text/html',
     '.css': 'text/css',
@@ -303,7 +303,7 @@ exports.createWebServer = function(options) {
       //  for a Processor has been called both cls and processor at different times. We
       //  support any of the four possibilities here.
       var processor = (svcObj.processor) ? (svcObj.processor.Processor || svcObj.processor) :
-                                           (svcObj.cls.Processor || svcObj.cls);
+        (svcObj.cls.Processor || svcObj.cls);
       //Processors can be supplied as constructed objects with handlers already embedded,
       //  if a handler is provided we construct a new processor, if not we use the processor
       //  object directly
@@ -318,9 +318,9 @@ exports.createWebServer = function(options) {
   }
 
   //Verify CORS requirements
-  function VerifyCORSAndSetHeaders(request, response) {
+  function VerifyCORSAndSetHeaders(request: http.IncomingMessage, response: http.ServerResponse) {
     if (request.headers.origin && options.cors) {
-      if (options.cors["*"] || options.cors[request.headers.origin]) {
+      if (options.cors["*"] || options.cors[request.headers.origin as string]) {
         //Allow, origin allowed
         response.setHeader("access-control-allow-origin", request.headers.origin);
         response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
@@ -339,11 +339,11 @@ exports.createWebServer = function(options) {
 
   //Handle OPTIONS method (CORS)
   ///////////////////////////////////////////////////
-  function processOptions(request, response) {
+  function processOptions(request: http.IncomingMessage, response: http.ServerResponse) {
     if (VerifyCORSAndSetHeaders(request, response)) {
-      response.writeHead("204", "No Content", {"content-length": 0});
+      response.writeHead(204, "No Content", { "content-length": 0 });
     } else {
-      response.writeHead("403", "Origin " + request.headers.origin + " not allowed", {});
+      response.writeHead(403, "Origin " + request.headers.origin + " not allowed", {});
     }
     response.end();
   }
@@ -351,27 +351,27 @@ exports.createWebServer = function(options) {
 
   //Handle POST methods (TXHRTransport)
   ///////////////////////////////////////////////////
-  function processPost(request, response) {
+  function processPost(request: http.IncomingMessage, response: http.ServerResponse) {
     //Lookup service
-    var uri = url.parse(request.url).pathname;
+    var uri = url.parse(request.url as string).pathname as string;
     var svc = services[uri];
     if (!svc) {
-      response.writeHead("403", "No Apache Thrift Service at " + uri, {});
+      response.writeHead(403, "No Apache Thrift Service at " + uri, {});
       response.end();
       return;
     }
 
     //Verify CORS requirements
     if (!VerifyCORSAndSetHeaders(request, response)) {
-      response.writeHead("403", "Origin " + request.headers.origin + " not allowed", {});
+      response.writeHead(403, "Origin " + request.headers.origin + " not allowed", {});
       response.end();
       return;
     }
 
     //Process XHR payload
-    request.on('data', svc.transport.receiver(function(transportWithData) {
+    request.on('data', svc.transport.receiver(function (transportWithData: any) {
       var input = new svc.protocol(transportWithData);
-      var output = new svc.protocol(new svc.transport(undefined, function(buf) {
+      var output = new svc.protocol(new svc.transport(undefined, function (buf: any) {
         try {
           response.writeHead(200);
           response.end(buf);
@@ -398,7 +398,7 @@ exports.createWebServer = function(options) {
 
   //Handle GET methods (Static Page Server)
   ///////////////////////////////////////////////////
-  function processGet(request, response) {
+  function processGet(request: http.IncomingMessage, response: http.ServerResponse) {
     //Undefined or empty base directory means do not serve static files
     if (!baseDir || "" === baseDir) {
       response.writeHead(404);
@@ -408,13 +408,13 @@ exports.createWebServer = function(options) {
 
     //Verify CORS requirements
     if (!VerifyCORSAndSetHeaders(request, response)) {
-      response.writeHead("403", "Origin " + request.headers.origin + " not allowed", {});
+      response.writeHead(403, "Origin " + request.headers.origin + " not allowed", {});
       response.end();
       return;
     }
 
     //Locate the file requested and send it
-    var uri = url.parse(request.url).pathname;
+    var uri = url.parse(request.url as string).pathname as string
     var filename = path.resolve(path.join(baseDir, uri));
 
     //Ensure the basedir path is not able to be escaped
@@ -424,8 +424,8 @@ exports.createWebServer = function(options) {
       return;
     }
 
-    fs.exists(filename, function(exists) {
-      if(!exists) {
+    fs.exists(filename, function (exists) {
+      if (!exists) {
         response.writeHead(404);
         response.end();
         return;
@@ -435,13 +435,13 @@ exports.createWebServer = function(options) {
         filename += '/index.html';
       }
 
-      fs.readFile(filename, "binary", function(err, file) {
+      fs.readFile(filename, "binary", function (err, file) {
         if (err) {
           response.writeHead(500);
           response.end(err + "\n");
           return;
         }
-        var headers = {};
+        var headers: http.OutgoingHttpHeaders = {};
         var contentType = contentTypesByExtension[path.extname(filename)];
         if (contentType) {
           headers["Content-Type"] = contentType;
@@ -459,12 +459,12 @@ exports.createWebServer = function(options) {
 
   //Handle WebSocket calls (TWebSocketTransport)
   ///////////////////////////////////////////////////
-  function processWS(data, socket, svc, binEncoding) {
-    svc.transport.receiver(function(transportWithData) {
+  function processWS(data: any, socket: any, svc: any, binEncoding: any) {
+    svc.transport.receiver(function (transportWithData: any) {
       var input = new svc.protocol(transportWithData);
-      var output = new svc.protocol(new svc.transport(undefined, function(buf) {
+      var output = new svc.protocol(new svc.transport(undefined, function (buf: any) {
         try {
-          var frame = wsFrame.encode(buf, null, binEncoding);
+          var frame = wsFrame.encode(buf, null as any, binEncoding);
           socket.write(frame);
         } catch (err) {
           //TODO: Add better error processing
@@ -498,7 +498,7 @@ exports.createWebServer = function(options) {
   //   - GET static files,
   //   - POST XHR Thrift services
   //   - OPTIONS CORS requests
-  server.on('request', function(request, response) {
+  server.on('request', function (request, response) {
     if (request.method === 'POST') {
       processPost(request, response);
     } else if (request.method === 'GET') {
@@ -509,12 +509,12 @@ exports.createWebServer = function(options) {
       response.writeHead(500);
       response.end();
     }
-  }).on('upgrade', function(request, socket, head) {
+  }).on('upgrade', function (request, socket, head) {
     //Lookup service
-    var svc;
+    var svc: any;
     try {
       svc = services[Object.keys(services)[0]];
-    } catch(e) {
+    } catch (e) {
       socket.write("HTTP/1.1 403 No Apache Thrift Service available\r\n\r\n");
       return;
     }
@@ -522,15 +522,15 @@ exports.createWebServer = function(options) {
     var hash = crypto.createHash("sha1");
     hash.update(request.headers['sec-websocket-key'] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
     socket.write("HTTP/1.1 101 Switching Protocols\r\n" +
-                   "Upgrade: websocket\r\n" +
-                   "Connection: Upgrade\r\n" +
-                   "Sec-WebSocket-Accept: " + hash.digest("base64") + "\r\n" +
-                   "Sec-WebSocket-Origin: " + request.headers.origin + "\r\n" +
-                   "Sec-WebSocket-Location: ws://" + request.headers.host + request.url + "\r\n" +
-                   "\r\n");
+      "Upgrade: websocket\r\n" +
+      "Connection: Upgrade\r\n" +
+      "Sec-WebSocket-Accept: " + hash.digest("base64") + "\r\n" +
+      "Sec-WebSocket-Origin: " + request.headers.origin + "\r\n" +
+      "Sec-WebSocket-Location: ws://" + request.headers.host + request.url + "\r\n" +
+      "\r\n");
     //Handle WebSocket traffic
-    var data = null;
-    socket.on('data', function(frame) {
+    var data: any = null;
+    socket.on('data', function (frame: any) {
       try {
         while (frame) {
           var result = wsFrame.decode(frame);
@@ -555,7 +555,7 @@ exports.createWebServer = function(options) {
           //Prepare next frame for decoding (if any)
           frame = result.nextFrame;
         }
-      } catch(e) {
+      } catch (e) {
         log.error('TWebSocketTransport Exception: ' + e);
         socket.destroy();
       }
