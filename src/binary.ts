@@ -26,11 +26,11 @@ var POW_48 = Math.pow(2, 48);
 var POW_52 = Math.pow(2, 52);
 var POW_1022 = Math.pow(2, 1022);
 
-exports.readByte = function(b){
-	return b > 127 ? b-256 : b;
-};
+export function readByte(b: number) {
+  return b > 127 ? b - 256 : b;
+}
 
-exports.readI16 = function(buff, off) {
+export function readI16(buff: Buffer, off: number) {
   off = off || 0;
   var v = buff[off + 1];
   v += buff[off] << 8;
@@ -40,7 +40,7 @@ exports.readI16 = function(buff, off) {
   return v;
 };
 
-exports.readI32 = function(buff, off) {
+export function readI32(buff: Buffer, off: number) {
   off = off || 0;
   var v = buff[off + 3];
   v += buff[off + 2] << 8;
@@ -52,14 +52,14 @@ exports.readI32 = function(buff, off) {
   return v;
 };
 
-exports.writeI16 = function(buff, v) {
+export function writeI16(buff: Buffer, v: number) {
   buff[1] = v & 0xff;
   v >>= 8;
   buff[0] = v & 0xff;
   return buff;
 };
 
-exports.writeI32 = function(buff, v) {
+export function writeI32(buff: Buffer, v: number) {
   buff[3] = v & 0xff;
   v >>= 8;
   buff[2] = v & 0xff;
@@ -70,19 +70,19 @@ exports.writeI32 = function(buff, v) {
   return buff;
 };
 
-exports.readDouble = function(buff, off) {
+export function readDouble(buff: Buffer, off: number) {
   off = off || 0;
   var signed = buff[off] & 0x80;
-  var e = (buff[off+1] & 0xF0) >> 4;
+  var e = (buff[off + 1] & 0xF0) >> 4;
   e += (buff[off] & 0x7F) << 4;
 
-  var m = buff[off+7];
-  m += buff[off+6] << 8;
-  m += buff[off+5] << 16;
-  m += buff[off+4] * POW_24;
-  m += buff[off+3] * POW_32;
-  m += buff[off+2] * POW_40;
-  m += (buff[off+1] & 0x0F) * POW_48;
+  var m = buff[off + 7];
+  m += buff[off + 6] << 8;
+  m += buff[off + 5] << 16;
+  m += buff[off + 4] * POW_24;
+  m += buff[off + 3] * POW_32;
+  m += buff[off + 2] * POW_40;
+  m += (buff[off + 1] & 0x0F) * POW_48;
 
   switch (e) {
     case 0:
@@ -106,7 +106,7 @@ exports.readDouble = function(buff, off) {
  * Based on code from the jspack module:
  * http://code.google.com/p/jspack/
  */
-exports.writeDouble = function(buff, v) {
+export function writeDouble(buff: Buffer, v: number) {
   var m, e, c;
 
   buff[0] = (v < 0 ? 0x80 : 0x00);
@@ -127,20 +127,17 @@ exports.writeDouble = function(buff, v) {
       c *= 2;
     }
 
-    if (e + 1023 >= 2047)
-    {
+    if (e + 1023 >= 2047) {
       // Overflow
       m = 0;
       e = 2047;
     }
-    else if (e + 1023 >= 1)
-    {
+    else if (e + 1023 >= 1) {
       // Normalized - term order matters, as Math.pow(2, 52-e) and v*Math.pow(2, 52) can overflow
-      m = (v*c-1) * POW_52;
+      m = (v * c - 1) * POW_52;
       e += 1023;
     }
-    else
-    {
+    else {
       // Denormalized - also catches the '0' case, somewhat by chance
       m = (v * POW_1022) * POW_52;
       e = 0;
