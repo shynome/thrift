@@ -29,7 +29,7 @@ import *as log from './log';
  * @example
  *   var transport = new Thrift.TWebSocketTransport("http://localhost:8585");
  */
-class TWebSocketTransport {
+export class TWebSocketTransport {
   constructor(
     public url: string = '', //Where to connect
   ) {
