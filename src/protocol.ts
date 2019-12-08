@@ -17,6 +17,6 @@
  * under the License.
  */
 
-module.exports.TBinaryProtocol = require('./binary_protocol');
-module.exports.TCompactProtocol = require('./compact_protocol');
-module.exports.TJSONProtocol = require('./json_protocol');
+export { TBinaryProtocol } from './binary_protocol';
+export { TCompactProtocol } from './compact_protocol';
+export { TJSONProtocol } from './json_protocol';
