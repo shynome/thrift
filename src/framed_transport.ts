@@ -183,3 +183,5 @@ export class TFramedTransport {
   };
 
 }
+
+export default TFramedTransport
