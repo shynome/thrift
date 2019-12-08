@@ -17,38 +17,43 @@
  * under the License.
  */
 
-var constants = require('constants');
-var net = require('net');
-var tls = require('tls');
+import constants from 'constants';
+import net from 'net';
+import tls from 'tls';
 
-var TBufferedTransport = require('./buffered_transport');
-var TBinaryProtocol = require('./binary_protocol');
-var InputBufferUnderrunError = require('./input_buffer_underrun_error');
+import TBufferedTransport from './buffered_transport';
+import TBinaryProtocol from './binary_protocol';
+import InputBufferUnderrunError from './input_buffer_underrun_error';
+
+interface ServerOptions {
+  transport: any
+  protocol: any
+  tls: any
+}
 
 /**
  * Create a Thrift server which can serve one or multiple services.
- * @param {object} processor - A normal or multiplexedProcessor (must
- *                             be preconstructed with the desired handler).
- * @param {ServerOptions} options - Optional additional server configuration.
- * @returns {object} - The Apache Thrift Multiplex Server.
+ * @param processor - A normal or multiplexedProcessor (must be preconstructed with the desired handler).
+ * @param options - Optional additional server configuration.
+ * @returns - The Apache Thrift Multiplex Server.
  */
-exports.createMultiplexServer = function(processor, options) {
+export function createMultiplexServer(processor: any, options: ServerOptions): any {
   var transport = (options && options.transport) ? options.transport : TBufferedTransport;
   var protocol = (options && options.protocol) ? options.protocol : TBinaryProtocol;
 
-  function serverImpl(stream) {
+  function serverImpl(this: any, stream: any) {
     var self = this;
-    stream.on('error', function(err) {
-        self.emit('error', err);
+    stream.on('error', function (err: any) {
+      self.emit('error', err);
     });
-    stream.on('data', transport.receiver(function(transportWithData) {
+    stream.on('data', transport.receiver(function (transportWithData: any) {
       var input = new protocol(transportWithData);
-      var output = new protocol(new transport(undefined, function(buf) {
+      var output = new protocol(new transport(undefined, function (buf: any) {
         try {
-            stream.write(buf);
+          stream.write(buf);
         } catch (err) {
-            self.emit('error', err);
-            stream.end();
+          self.emit('error', err);
+          stream.end();
         }
       }));
 
@@ -83,7 +88,7 @@ exports.createMultiplexServer = function(processor, options) {
       }
     }));
 
-    stream.on('end', function() {
+    stream.on('end', function () {
       stream.end();
     });
   }
@@ -105,7 +110,7 @@ exports.createMultiplexServer = function(processor, options) {
  * @param {ServerOptions} options - Optional additional server configuration.
  * @returns {object} - The Apache Thrift Multiplex Server.
  */
-exports.createServer = function(processor, handler, options) {
+exports.createServer = function (processor: any, handler: any, options: ServerOptions) {
   if (processor.Processor) {
     processor = processor.Processor;
   }
