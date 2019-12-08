@@ -272,7 +272,7 @@ export interface ServiceOptions {
  * @param options - The server configuration.
  * @returns - The Apache Thrift Web Server.
  */
-exports.createWebServer = function (options: ServerOptions): any {
+export function createWebServer(options: ServerOptions): any {
   var baseDir = options.files;
   var contentTypesByExtension: { [k: string]: string } = {
     '.txt': 'text/plain',
