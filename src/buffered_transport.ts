@@ -170,3 +170,5 @@ export class TBufferedTransport {
 
 
 }
+
+export default TBufferedTransport

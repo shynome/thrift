@@ -50,3 +50,5 @@ export function createClient(ServiceClient: any, connection: any): object {
   connection.client = client;
   return client;
 };
+
+export default createClient
