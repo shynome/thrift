@@ -18,7 +18,7 @@
  */
 import util from 'util';
 
-export const enum Type {
+export enum Type {
   STOP = 0,
   VOID = 1,
   BOOL = 2,
@@ -38,7 +38,7 @@ export const enum Type {
   UTF16 = 17
 };
 
-export const enum MessageType {
+export enum MessageType {
   CALL = 1,
   REPLY = 2,
   EXCEPTION = 3,
@@ -48,7 +48,7 @@ export const enum MessageType {
 export class TException extends Error {
 };
 
-export const enum TApplicationExceptionType {
+export enum TApplicationExceptionType {
   UNKNOWN = 0,
   UNKNOWN_METHOD = 1,
   INVALID_MESSAGE_TYPE = 2,
@@ -129,7 +129,7 @@ export class TApplicationException extends TException {
   };
 }
 
-export const enum TProtocolExceptionType {
+export enum TProtocolExceptionType {
   UNKNOWN = 0,
   INVALID_DATA = 1,
   NEGATIVE_SIZE = 2,
