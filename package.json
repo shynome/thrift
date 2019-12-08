@@ -1,24 +1,17 @@
 {
   "name": "@shynome/thrift",
   "description": "node.js bindings for the Apache Thrift RPC system",
-  "homepage": "http://thrift.apache.org/",
+  "homepage": "https://github.com/shynome/thrift#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/apache/thrift.git"
+    "url": "https://github.com/shynome/thrift.git"
   },
   "version": "0.12.0",
   "author": {
-    "name": "Apache Thrift Developers",
-    "email": "dev@thrift.apache.org",
-    "url": "http://thrift.apache.org"
+    "name": "shynome",
+    "email": "shynome@gmail.com"
   },
-  "license": "Apache-2.0",
-  "licenses": [
-    {
-      "type": "Apache-2.0",
-      "url": "http://www.apache.org/licenses/LICENSE-2.0"
-    }
-  ],
+  "license": "MIT",
   "engines": {
     "node": ">= 12.0.0"
   },
@@ -36,12 +29,5 @@
     "ts-jest": "^24.2.0",
     "typescript": "^3.7.3"
   },
-  "scripts": {
-    "cover": "lib/nodejs/test/testAll.sh COVER",
-    "test": "lib/nodejs/test/testAll.sh",
-    "test-ts": "lib/nodets/test/testAll.sh",
-    "prettier": "prettier --write '**/*.js'",
-    "lint": "eslint lib/nodejs/. --ext .js",
-    "lint-tests": "eslint lib/nodejs/test/. --ext .js"
-  }
+  "scripts": {}
 }
