@@ -17,15 +17,13 @@
  * under the License.
  */
 
-module.exports = createClient;
-
 /**
  * Creates a new client object for the specified Thrift service.
- * @param {object} ServiceClient - The module containing the generated service client
- * @param {Connection} Connection - The connection to use.
- * @returns {object} The client object.
+ * @param ServiceClient - The module containing the generated service client
+ * @param Connection - The connection to use.
+ * @returns The client object.
  */
-function createClient(ServiceClient, connection) {
+export function createClient(ServiceClient: any, connection: any): object {
   // TODO validate required options and throw otherwise
   if (ServiceClient.Client) {
     ServiceClient = ServiceClient.Client;
@@ -43,7 +41,7 @@ function createClient(ServiceClient, connection) {
   //   - Callback to call on flush
 
   // Wrap the write method
-  var writeCb = function(buf, seqid) {
+  var writeCb = function (buf: Buffer, seqid: number) {
     connection.write(buf, seqid);
   };
   var transport = new connection.transport(undefined, writeCb);
