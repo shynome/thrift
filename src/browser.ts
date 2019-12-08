@@ -16,21 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-exports.Thrift = require('./thrift');
+import *as Thrift from './thrift';
+export { Thrift }
 
-var xhrConnection = require('./xhr_connection');
-exports.XHRConnection = xhrConnection.XHRConnection;
-exports.createXHRConnection = xhrConnection.createXHRConnection;
-exports.createXHRClient = xhrConnection.createXHRClient;
+export {
+  XHRConnection,
+  createXHRConnection,
+  createXHRClient,
+} from './xhr_connection'
 
-exports.Multiplexer = require('./multiplexed_protocol').Multiplexer;
+export { Multiplexer } from './multiplexed_protocol'
 
-exports.TWebSocketTransport = require('./ws_transport');
-exports.TBufferedTransport = require('./buffered_transport');
-exports.TFramedTransport = require('./framed_transport');
+export { TWebSocketTransport } from './ws_transport';
+export { TBufferedTransport } from './buffered_transport';
+export { TFramedTransport } from './framed_transport';
 
-exports.Protocol = exports.TJSONProtocol = require('./json_protocol');
-exports.TBinaryProtocol = require('./binary_protocol');
-exports.TCompactProtocol = require('./compact_protocol');
+import TJSONProtocol from 'json_protocol'
+export {
+  TJSONProtocol,
+  TJSONProtocol as Protocol,
+}
 
-exports.Int64 = require('node-int64');
+export { TBinaryProtocol } from './binary_protocol';
+export { TCompactProtocol } from './compact_protocol';
+
+export const Int64 = null;
