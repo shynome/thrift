@@ -32,7 +32,7 @@ var POW_1022 = Math.pow(2, 1022);
 /**
  * Compact Protocol type IDs used to keep type data within one nibble.
  */
-export const enum TCompactProtocolTypes {
+export enum TCompactProtocolTypes {
   /** End of a set of fields. */
   CT_STOP = 0x00,
   /** Flag for Boolean field with true value (packed field and value). */
