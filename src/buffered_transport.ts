@@ -22,7 +22,7 @@ import InputBufferUnderrunError from './input_buffer_underrun_error';
 import { TTransport, TTransportConstructor } from "./transport";
 
 export class TBufferedTransport implements TTransport {
-  static receiver = function (callback: any, seqid: number) {
+  static receiver = function (callback: (trans: TBufferedTransport, seqid: number) => void, seqid: number) {
     var reader = new TBufferedTransport();
 
     return function (data: Buffer) {
@@ -56,7 +56,7 @@ export class TBufferedTransport implements TTransport {
     this.outCount = 0;
   }
 
-  commitPosition() {
+  commitPosition(): void {
     var unreadSize = this.writeCursor - this.readCursor;
     var bufSize = (unreadSize * 2 > this.defaultReadBufferSize) ?
       unreadSize * 2 : this.defaultReadBufferSize;
@@ -68,27 +68,27 @@ export class TBufferedTransport implements TTransport {
     this.writeCursor = unreadSize;
     this.inBuf = buf;
   };
-  rollbackPosition() {
+  rollbackPosition(): void {
     this.readCursor = 0;
   }
   // TODO: Implement open/close support
-  isOpen() {
+  isOpen(): boolean {
     return true;
   };
-  open() { return true };
-  close() { return true };
-  private _seqid: number | null = null;
+  open(): boolean { return true };
+  close(): boolean { return true };
+  private _seqid: number = null;
   // Set the seqid of the message in the client
   // So that callbacks can be found
-  setCurrSeqId(seqid: number) {
+  setCurrSeqId(seqid: number): void {
     this._seqid = seqid;
   };
-  ensureAvailable(len: number) {
+  ensureAvailable(len: number): void {
     if (this.readCursor + len > this.writeCursor) {
       throw new InputBufferUnderrunError();
     }
   };
-  read(len: number) {
+  read(len: number): Buffer {
     this.ensureAvailable(len);
     var buf = new Buffer(len);
     this.inBuf.copy(buf, 0, this.readCursor, this.readCursor + len);
