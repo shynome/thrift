@@ -25,7 +25,7 @@ export class MultiplexedProcessor {
   registerProcessor(name: string, handler: any) {
     this.services[name] = handler;
   };
-  process(inp: TProtocol, out: TProtocol) {
+  process(inp: TProtocol, out: TProtocol): void {
     var begin = inp.readMessageBegin();
 
     if (begin.mtype != Thrift.MessageType.CALL && begin.mtype != Thrift.MessageType.ONEWAY) {
