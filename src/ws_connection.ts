@@ -19,14 +19,22 @@
 import WebSocket from 'ws';
 import { EventEmitter } from "events";
 import *as thrift from './thrift';
-import *as ttransport from './transport';
-import *as tprotocol from './protocol';
 
 import TBufferedTransport from './buffered_transport';
 import TJSONProtocol from './json_protocol';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
+import { ConnectOptions as BaseConnectOptions, SeqId2Service } from "./connection";
 
 import createClient from './create_client';
+import { TTransportConstructor } from './transport';
+import { TProtocolConstructor } from './protocol';
+
+export interface WSOptions {
+  host: string;
+  port: number;
+  path: string;
+  headers: thrift.HttpHeaders;
+}
 
 /**
  * @example
@@ -46,28 +54,11 @@ import createClient from './create_client';
  *     client.myServiceFunction();
  *     con.close()
  */
-export interface WSConnectOptions {
-  /** The Thrift layered transport to use (TBufferedTransport, etc). */
-  transport: any
-  /** The Thrift serialization protocol to use (TJSONProtocol, etc.). */
-  protocol: any
-  /** The URL path to connect to (e.g. "/", "/mySvc", "/thrift/quoteSvc", etc.). */
-  path: string
-  /**
-   * A standard Node.js header hash, an object hash containing key/value
-   * pairs where the key is the header name string and the value is the header value string.
-   */
-  headers: WebSocket.ClientOptions['headers']
+export interface WSConnectOptions extends BaseConnectOptions {
   /** True causes the connection to use wss, otherwise ws is used. */
-  secure: boolean
+  secure?: boolean
   /** Options passed on to WebSocket. */
-  wsOptions: WebSocket.ClientOptions & {
-    [k: string]: any
-    host: string,
-    port: number,
-    path: WSConnectOptions['path'],
-    headers: WSConnectOptions['headers']
-  }
+  wsOptions?: WSOptions
 }
 
 
@@ -87,22 +78,16 @@ export interface WSConnectOptions {
  */
 export class WSConnection extends EventEmitter {
 
-  options: WSConnectOptions
-  host: string
-  port: number
-  secure: WSConnectOptions['secure']
-  transport: WSConnectOptions['transport']
-  protocol: WSConnectOptions['protocol']
-  path: WSConnectOptions['path']
-
-  send_pending: any[] = []
-
-  /**
-   * The sequence map is used to map seqIDs back to the calling client in multiplexed scenarios
-   */
-  seqId2Service: { [k: string]: any } = {};
-
-  wsOptions: WSConnectOptions['wsOptions']
+  seqId2Service: SeqId2Service = {};
+  options: WSConnectOptions;
+  host: string;
+  port: number;
+  secure: boolean;
+  transport: TTransportConstructor;
+  protocol: TProtocolConstructor;
+  path: string;
+  send_pending: Buffer[] = [];
+  wsOptions: WSOptions;
 
   /**
    * @param host - The host name or IP to connect to.
@@ -133,6 +118,7 @@ export class WSConnection extends EventEmitter {
       headers: this.options.headers || {}
     };
     for (var attrname in this.options.wsOptions) {
+      // @ts-ignore
       this.wsOptions[attrname] = this.options.wsOptions[attrname];
     }
   };
@@ -240,13 +226,13 @@ export class WSConnection extends EventEmitter {
   /**
    * Opens the transport connection
    */
-  open() {
+  open(): void {
     //If OPEN/CONNECTING/CLOSING ignore additional opens
     if (this.socket && this.socket.readyState != this.socket.CLOSED) {
       return;
     }
     //If there is no socket or the socket is closed:
-    this.socket = new WebSocket(this.uri(), "", this.wsOptions);
+    this.socket = new WebSocket(this.uri(), "", this.wsOptions as any);
     this.socket.binaryType = 'arraybuffer';
     this.socket.onopen = this.__onOpen.bind(this);
     this.socket.onmessage = this.__onMessage.bind(this);
@@ -257,7 +243,7 @@ export class WSConnection extends EventEmitter {
   /**
    * Closes the transport connection
    */
-  close() {
+  close(): void {
     this.socket.close();
   };
 
@@ -283,12 +269,9 @@ export class WSConnection extends EventEmitter {
 
   /**
    * Writes Thrift message data to the connection
-   * @param {Buffer} data - A Node.js Buffer containing the data to write
-   * @returns {void} No return value.
-   * @event {error} the "error" event is raised upon request failure passing the
-   *     Node.js error object to the listener.
+   * @param data - A Node.js Buffer containing the data to write
    */
-  write(data: Buffer) {
+  write(data: Buffer): void {
     if (this.isOpen()) {
       //Send data and register a callback to invoke the client callback
       this.socket.send(data);
