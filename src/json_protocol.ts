@@ -18,12 +18,13 @@
  */
 
 import *as Thrift from './thrift';
-import { Type as ThriftType } from './thrift';
 
 import *as Int64Util from './int64_util';
 import json_parse from './json_parse';
 
 import InputBufferUnderrunError from './input_buffer_underrun_error';
+import { TTransport } from './transport';
+import { TProtocol, TMessage, TStruct, TField, TMap, TList, TSet } from './protocol';
 
 
 
@@ -45,17 +46,17 @@ export enum TJSONProtocolType {
 }
 
 export enum TJSONProtocolRType {
-  tf = ThriftType.BOOL,
-  i8 = ThriftType.BYTE,
-  i16 = ThriftType.I16,
-  i32 = ThriftType.I32,
-  i64 = ThriftType.I64,
-  dbl = ThriftType.DOUBLE,
-  rec = ThriftType.STRUCT,
-  str = ThriftType.STRING,
-  map = ThriftType.MAP,
-  lst = ThriftType.LIST,
-  set = ThriftType.SET,
+  tf = Thrift.Type.BOOL,
+  i8 = Thrift.Type.BYTE,
+  i16 = Thrift.Type.I16,
+  i32 = Thrift.Type.I32,
+  i64 = Thrift.Type.I64,
+  dbl = Thrift.Type.DOUBLE,
+  rec = Thrift.Type.STRUCT,
+  str = Thrift.Type.STRING,
+  map = Thrift.Type.MAP,
+  lst = Thrift.Type.LIST,
+  set = Thrift.Type.SET,
 }
 
 
@@ -79,23 +80,23 @@ interface AnonReadFieldBeginReturn {
   /**The name of the field (always ''). */
   fname: string
   /**The data type of the field. */
-  ftype: ThriftType
+  ftype: Thrift.Type
   /**The unique identifier of the field. */
   fid: number
 }
 
 interface AnonReadMapBeginReturn {
   /**The data type of the key. */
-  ktype: ThriftType
+  ktype: Thrift.Type
   /**The data type of the value. */
-  vtype: ThriftType
+  vtype: Thrift.Type
   /**The number of elements in the map. */
   size: number
 }
 
 interface AnonReadColBeginReturn {
   /**The data type of the element. */
-  etype: ThriftType,
+  etype: Thrift.Type,
   /**The number of elements in the collection. */
   size: number,
 }
@@ -108,7 +109,7 @@ interface AnonReadColBeginReturn {
  * @example
  *     var protocol  = new Thrift.Protocol(transport);
  */
-export class TJSONProtocol {
+export class TJSONProtocol implements TProtocol {
 
   /**
    * The TJSONProtocol version number.
@@ -121,10 +122,10 @@ export class TJSONProtocol {
    *@param {Thrift.Transport} trans - The transport to serialize to/from.
    */
   constructor(
-    public trans: any
+    private trans: TTransport
   ) { }
 
-  flush() {
+  public flush(): void {
     this.writeToTransportIfStackIsFlushable();
     return this.trans.flush();
   };
@@ -137,20 +138,20 @@ export class TJSONProtocol {
 
   /**
    * Serializes the beginning of a Thrift RPC message.
-   * @param {string} name - The service method to call.
-   * @param {Thrift.MessageType} messageType - The type of method call.
-   * @param {number} seqid - The sequence number of this call (always 0 in Apache Thrift).
+   * @param name - The service method to call.
+   * @param messageType - The type of method call.
+   * @param seqid - The sequence number of this call (always 0 in Apache Thrift).
    */
-  writeMessageBegin(name: string, messageType: Thrift.MessageType, seqid: number) {
+  public writeMessageBegin(name: string, messageType: Thrift.MessageType, seqid: number): void {
     this.tstack.push([TJSONProtocol.Version, '"' + name + '"', messageType, seqid]);
   };
 
-  wobj: Wobj = null as any
-  wbuf: string = null as any
+  private wobj: Wobj = null
+  private wbuf: string = null
   /**
    * Serializes the end of a Thrift RPC message.
    */
-  writeMessageEnd() {
+  public writeMessageEnd(): void {
     var obj = this.tstack.pop();
 
     this.wobj = this.tstack.pop() as any;
@@ -162,12 +163,11 @@ export class TJSONProtocol {
     this.trans.write(this.wbuf);
   };
 
-
   /**
    * Serializes the beginning of a struct.
    * @param name - The name of the struct.
    */
-  writeStructBegin(name: string) {
+  public writeStructBegin(name: string): void {
     this.tpos.push(this.tstack.length);
     this.tstack.push({} as any);
   };
@@ -175,7 +175,7 @@ export class TJSONProtocol {
   /**
    * Serializes the end of a struct.
    */
-  writeStructEnd() {
+  public writeStructEnd(): void {
     var p = this.tpos.pop() as number;
     var struct = this.tstack[p];
     var str = '{';
@@ -198,11 +198,11 @@ export class TJSONProtocol {
 
   /**
    * Serializes the beginning of a struct field.
-   * @param {string} name - The name of the field.
-   * @param {Thrift.Protocol.Type} fieldType - The data type of the field.
-   * @param {number} fieldId - The field's unique identifier.
+   * @param name - The name of the field.
+   * @param fieldType - The data type of the field.
+   * @param fieldId - The field's unique identifier.
    */
-  writeFieldBegin(name: string, fieldType: any, fieldId: number) {
+  public writeFieldBegin(name: string, fieldType: Thrift.Type, fieldId: number): void {
     this.tpos.push(this.tstack.length);
     this.tstack.push({
       'fieldId': '"' +
@@ -215,7 +215,7 @@ export class TJSONProtocol {
   /**
    * Serializes the end of a field.
    */
-  writeFieldEnd() {
+  public writeFieldEnd(): void {
     var value = this.tstack.pop();
     var fieldInfo = this.tstack.pop();
 
@@ -241,9 +241,9 @@ export class TJSONProtocol {
    * Serializes the beginning of a map collection.
    * @param keyType - The data type of the key.
    * @param valType - The data type of the value.
-   * @param [size] - The number of elements in the map (ignored).
+   * @param size - The number of elements in the map (ignored).
    */
-  writeMapBegin(keyType: ThriftType, valType: ThriftType, size?: number) {
+  public writeMapBegin(keyType: Thrift.Type, valType: Thrift.Type, size?: number): void {
     //size is invalid, we'll set it on end.
     this.tpos.push(this.tstack.length);
     // @ts-ignore
@@ -253,7 +253,7 @@ export class TJSONProtocol {
   /**
    * Serializes the end of a map.
    */
-  writeMapEnd() {
+  public writeMapEnd(): void {
     var p = this.tpos.pop() as number;
 
     if (p == this.tstack.length) {
@@ -292,10 +292,10 @@ export class TJSONProtocol {
 
   /**
    * Serializes the beginning of a list collection.
-   * @param {Thrift.Type} elemType - The data type of the elements.
-   * @param {number} size - The number of elements in the list.
+   * @param elemType - The data type of the elements.
+   * @param size - The number of elements in the list.
    */
-  writeListBegin(elemType: ThriftType, size: number) {
+  public writeListBegin(elemType: Thrift.Type, size: number): void {
     this.tpos.push(this.tstack.length);
     // @ts-ignore
     this.tstack.push([TJSONProtocolType[elemType], size]);
@@ -304,7 +304,7 @@ export class TJSONProtocol {
   /**
    * Serializes the end of a list.
    */
-  writeListEnd() {
+  public writeListEnd(): void {
     var p = this.tpos.pop() as number;
 
     while (this.tstack.length > p + 1) {
@@ -323,7 +323,7 @@ export class TJSONProtocol {
    * @param {Thrift.Type} elemType - The data type of the elements.
    * @param {number} size - The number of elements in the list.
    */
-  writeSetBegin(elemType: ThriftType, size: number) {
+  public writeSetBegin(elemType: Thrift.Type, size: number): void {
     this.tpos.push(this.tstack.length);
     // @ts-ignore
     this.tstack.push([TJSONProtocolType[elemType], size]);
@@ -332,7 +332,7 @@ export class TJSONProtocol {
   /**
    * Serializes the end of a set.
    */
-  writeSetEnd() {
+  public writeSetEnd(): void {
     var p = this.tpos.pop() as number;
 
     while (this.tstack.length > p + 1) {
@@ -347,28 +347,28 @@ export class TJSONProtocol {
   };
 
   /** Serializes a boolean */
-  writeBool(bool: boolean) {
+  public writeBool(bool: boolean): void {
     this.tstack.push(bool ? 1 : 0);
   };
 
   /** Serializes a number */
-  writeByte(byte: any) {
+  public writeByte(byte: number): void {
     this.tstack.push(byte);
   };
 
   /** Serializes a number */
-  writeI16(i16: any) {
+  public writeI16(i16: number): void {
     this.tstack.push(i16);
   };
 
   /** Serializes a number */
-  writeI32(i32: any) {
+  public writeI32(i32: number): void {
     this.tstack.push(i32);
   };
 
   /** Serializes a number */
-  writeI64(i64: BigInt) {
-    if (i64 instanceof BigInt) {
+  public writeI64(i64: number | bigint): void {
+    if (typeof i64 === 'bigint') {
       this.tstack.push(Int64Util.toDecimalString(i64));
     } else {
       this.tstack.push(i64);
@@ -376,12 +376,12 @@ export class TJSONProtocol {
   };
 
   /** Serializes a number */
-  writeDouble(dub: any) {
+  public writeDouble(dub: number): void {
     this.tstack.push(dub);
   };
 
   /** Serializes a string */
-  writeString(arg: any) {
+  public writeString(arg: string | Buffer): void {
     // We do not encode uri components for wire transfer:
     if (arg === null) {
       this.tstack.push(null);
@@ -429,7 +429,7 @@ export class TJSONProtocol {
   };
 
   /** Serializes a string */
-  writeBinary(arg: any) {
+  public writeBinary(arg: string | Buffer): void {
     var buf: any
     if (typeof arg === 'string') {
       buf = new Buffer(arg, 'binary');
@@ -443,10 +443,10 @@ export class TJSONProtocol {
   };
 
 
-  rstack: any[] = []
-  rpos: number[] = []
-  robj: string[] = []
-  readMessageBegin(): AnonReadMessageBeginReturn {
+  private rstack: any[] = []
+  private rpos: number[] = []
+  private robj: string[] = []
+  public readMessageBegin(): TMessage {
     this.rstack = [];
     this.rpos = [];
 
@@ -518,15 +518,15 @@ export class TJSONProtocol {
   };
 
   /** Deserializes the end of a message. */
-  readMessageEnd() {
+  public readMessageEnd(): void {
   };
 
   /**
    * Deserializes the beginning of a struct.
-   * @param {string} [name] - The name of the struct (ignored)
-   * @returns {object} - An object with an empty string fname property
+   * @param [name] - The name of the struct (ignored)
+   * @returns - An object with an empty string fname property
    */
-  readStructBegin() {
+  public readStructBegin(): TStruct {
     var r: any = {};
     r.fname = '';
 
@@ -539,17 +539,17 @@ export class TJSONProtocol {
   };
 
   /** Deserializes the end of a struct. */
-  readStructEnd() {
+  public readStructEnd(): void {
     this.rstack.pop();
   };
   /**
    * Deserializes the beginning of a field.
    */
-  readFieldBegin(): AnonReadFieldBeginReturn {
+  public readFieldBegin(): TField {
     var r: AnonReadFieldBeginReturn = {} as any;
 
     var fid = -1;
-    var ftype = ThriftType.STOP;
+    var ftype = Thrift.Type.STOP;
 
     //get a fieldId
     for (var f in (this.rstack[this.rstack.length - 1])) {
@@ -593,7 +593,7 @@ export class TJSONProtocol {
   };
 
   /** Deserializes the end of a field. */
-  readFieldEnd() {
+  public readFieldEnd(): void {
     var pos = this.rpos.pop() as number;
 
     //get back to the right place in the stack
@@ -606,7 +606,7 @@ export class TJSONProtocol {
   /**
    * Deserializes the beginning of a map.
    */
-  readMapBegin(): AnonReadMapBeginReturn {
+  public readMapBegin(): TMap {
     var map = this.rstack.pop();
     var first = map.shift();
     if (first instanceof Array) {
@@ -629,14 +629,14 @@ export class TJSONProtocol {
   };
 
   /** Deserializes the end of a map. */
-  readMapEnd() {
+  public readMapEnd(): void {
     this.readFieldEnd();
   };
 
   /**
    * Deserializes the beginning of a list.
    */
-  readListBegin(): AnonReadColBeginReturn {
+  public readListBegin(): TList {
     var list = this.rstack[this.rstack.length - 1];
 
     var r: AnonReadColBeginReturn = {} as any;
@@ -651,7 +651,7 @@ export class TJSONProtocol {
   };
 
   /** Deserializes the end of a list. */
-  readListEnd() {
+  public readListEnd(): void {
     var pos = (this.rpos.pop() as number) - 2;
     var st = this.rstack;
     st.pop();
@@ -663,28 +663,28 @@ export class TJSONProtocol {
   /**
    * Deserializes the beginning of a set.
    */
-  readSetBegin(): AnonReadColBeginReturn {
+  public readSetBegin(): TSet {
     return this.readListBegin();
   };
   /** Deserializes the end of a set. */
-  readSetEnd() {
+  public readSetEnd(): void {
     return this.readListEnd();
   };
 
 
-  readBool() {
+  public readBool(): boolean {
     return this.readValue() == '1';
   };
 
-  readByte() {
+  public readByte(): number {
     return this.readI32();
   };
 
-  readI16() {
+  public readI16(): number {
     return this.readI32();
   };
 
-  readI32(f?: any) {
+  public readI32(f?: any): number {
     return +this.readValue();
   }
 
@@ -721,7 +721,7 @@ export class TJSONProtocol {
     return r.value;
   };
 
-  readI64() {
+  public readI64(): bigint {
     var n = this.readValue()
     if (typeof n === 'string') {
       // Assuming no one is sending in 1.11111e+33 format
@@ -731,57 +731,57 @@ export class TJSONProtocol {
     }
   };
 
-  readDouble() {
+  public readDouble(): number {
     return this.readI32();
   };
 
-  readBinary() {
+  public readBinary(): Buffer {
     return new Buffer(this.readValue(), 'base64');
   };
 
-  readString() {
+  public readString(): string {
     return this.readValue();
   };
   /**
    * Returns the underlying transport.
    */
-  getTransport() {
+  public getTransport(): TTransport {
     return this.trans;
   };
 
   /**
    * Method to arbitrarily skip over data
    */
-  skip(type: ThriftType) {
+  public skip(type: Thrift.Type): void {
     switch (type) {
-      case ThriftType.STOP:
+      case Thrift.Type.STOP:
         return;
-      case ThriftType.BOOL:
+      case Thrift.Type.BOOL:
         this.readBool();
         break;
-      case ThriftType.BYTE:
+      case Thrift.Type.BYTE:
         this.readByte();
         break;
-      case ThriftType.I16:
+      case Thrift.Type.I16:
         this.readI16();
         break;
-      case ThriftType.I32:
+      case Thrift.Type.I32:
         this.readI32();
         break;
-      case ThriftType.I64:
+      case Thrift.Type.I64:
         this.readI64();
         break;
-      case ThriftType.DOUBLE:
+      case Thrift.Type.DOUBLE:
         this.readDouble();
         break;
-      case ThriftType.STRING:
+      case Thrift.Type.STRING:
         this.readString();
         break;
-      case ThriftType.STRUCT:
+      case Thrift.Type.STRUCT:
         this.readStructBegin();
         while (true) {
           var r = this.readFieldBegin();
-          if (r.ftype === ThriftType.STOP) {
+          if (r.ftype === Thrift.Type.STOP) {
             break;
           }
           this.skip(r.ftype);
@@ -789,7 +789,7 @@ export class TJSONProtocol {
         }
         this.readStructEnd();
         break;
-      case ThriftType.MAP:
+      case Thrift.Type.MAP:
         var mapBegin = this.readMapBegin();
         for (var i = 0; i < mapBegin.size; ++i) {
           this.skip(mapBegin.ktype);
@@ -797,14 +797,14 @@ export class TJSONProtocol {
         }
         this.readMapEnd();
         break;
-      case ThriftType.SET:
+      case Thrift.Type.SET:
         var setBegin = this.readSetBegin();
         for (var i2 = 0; i2 < setBegin.size; ++i2) {
           this.skip(setBegin.etype);
         }
         this.readSetEnd();
         break;
-      case ThriftType.LIST:
+      case Thrift.Type.LIST:
         var listBegin = this.readListBegin();
         for (var i3 = 0; i3 < listBegin.size; ++i3) {
           this.skip(listBegin.etype);
