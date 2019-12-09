@@ -59,8 +59,8 @@ class Connection extends EventEmitter {
   connection: net.Socket;
   ssl: boolean;
   options: ConnectOptions;
-  transport: TTransport;
-  protocol: TProtocol;
+  transport: TTransportConstructor;
+  protocol: TProtocolConstructor;
   offline_queue: Buffer[] = [];
   connected: boolean = false;
 
@@ -322,17 +322,17 @@ export {
 import child_process from 'child_process';
 import internal from "stream";
 interface StdIOConnectionOptions {
-  transport: any
-  protocol: any
+  transport?: TTransportConstructor
+  protocol?: TProtocolConstructor
 
 }
 export class StdIOConnection extends EventEmitter {
   child: child_process.ChildProcessWithoutNullStreams
   connection: internal.Writable
   options: StdIOConnectionOptions
-  transport: StdIOConnectionOptions['transport']
-  protocol: StdIOConnectionOptions['protocol']
-  offline_queue: any[] = [];
+  transport: TTransportConstructor
+  protocol: TProtocolConstructor
+  offline_queue: Buffer[] = [];
   frameLeft = 0;
   framePos = 0;
   frame: any = null;
@@ -350,7 +350,9 @@ export class StdIOConnection extends EventEmitter {
 
     this.connection = child.stdin;
     this.options = options || {};
+    // @ts-ignore
     this.transport = this.options.transport || TBufferedTransport;
+    // @ts-ignore
     this.protocol = this.options.protocol || TBinaryProtocol;
 
     if (log.getLogLevel() === 'debug') {

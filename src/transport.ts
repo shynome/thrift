@@ -38,6 +38,7 @@ export interface TTransport {
 export type TTransportCallback = (msg?: Buffer, seqid?: number) => void;
 
 export interface TTransportConstructor {
+  receiver(callback: (trans: TTransport, seqid: number) => void, seqid?: number): (data: Buffer) => void;
   new(buffer?: Buffer, callback?: TTransportCallback): TTransport;
 }
 
