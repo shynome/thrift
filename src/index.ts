@@ -19,25 +19,53 @@
 import *as Thrift from './thrift';
 export { Thrift }
 
-export { setLogFunc, setLogLevel, getLogLevel } from './log'
+export {
+  setLogFunc,
+  setLogLevel,
+  getLogLevel,
+} from './log'
 
-export * from './connection'
+export {
+  Connection,
 
-export * from './http_connection'
+  StdIOConnection,
+  createConnection,
+  createSSLConnection,
+  createUDSConnection,
+  createClient,
 
-export * from './ws_connection'
+  createStdIOConnection,
+  createStdIOClient,
+} from './connection'
 
-export * from './xhr_connection'
+export {
+  HttpConnection,
+  createHttpConnection,
+  createHttpUDSConnection,
+  createHttpClient,
+} from './http_connection'
 
-export * from './server'
+export {
+  WSConnection,
+  createWSConnection,
+  createWSClient,
+} from './ws_connection'
 
-export { createWebServer } from './web_server'
+export {
+  XHRConnection,
+  createXHRConnection,
+  createXHRClient,
+} from './xhr_connection'
 
-exports.Int64 = require('node-int64');
-exports.Q = require('q');
+export {
+  createServer,
+  createMultiplexServer,
+} from './server'
 
-export { MultiplexedProcessor } from './multiplexed_processor';
-export { Multiplexer } from './multiplexed_protocol';
+export { createWebServer, } from './web_server'
+
+export { MultiplexedProcessor, } from './multiplexed_processor';
+export { Multiplexer, } from './multiplexed_protocol';
 
 /*
  * Export transport and protocol so they can be used outside of a
