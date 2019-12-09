@@ -523,6 +523,7 @@ export class TCompactProtocol implements TProtocol {
 
   public readFieldBegin(): TField {
     var fieldId = 0;
+    // @ts-ignore
     var b: any = this.trans.readByte(b);
     var type = (b & 0x0f);
 
@@ -592,7 +593,7 @@ export class TCompactProtocol implements TProtocol {
   };
 
   public readSetBegin(): TSet {
-    return this.readListBegin();
+    return this.readListBegin() as any;
   };
   public readSetEnd(): void { };
 
@@ -603,7 +604,7 @@ export class TCompactProtocol implements TProtocol {
       value = this.boolValue_.boolValue;
       this.boolValue_.hasBoolValue = false;
     } else {
-      var res = this.trans.readByte();
+      var res: any = this.trans.readByte();
       rsize = res.rsize;
       value = (res.value == TCompactProtocolTypes.CT_BOOLEAN_TRUE);
     }
@@ -670,7 +671,7 @@ export class TCompactProtocol implements TProtocol {
     if (size < 0) {
       throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative binary size");
     }
-    return this.trans.read(size);
+    return this.trans.read(size as any);
   };
 
   public readString(): string {
@@ -684,6 +685,7 @@ export class TCompactProtocol implements TProtocol {
     if (size < 0) {
       throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative string size");
     }
+    // @ts-ignore
     return this.trans.readString(size);
   };
 

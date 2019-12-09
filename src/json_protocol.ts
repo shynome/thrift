@@ -663,7 +663,7 @@ export class TJSONProtocol implements TProtocol {
    * Deserializes the beginning of a set.
    */
   public readSetBegin(): TSet {
-    return this.readListBegin();
+    return this.readListBegin() as any;
   };
   /** Deserializes the end of a set. */
   public readSetEnd(): void {

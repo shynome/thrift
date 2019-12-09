@@ -39,7 +39,7 @@ export interface TField {
 
 export interface TList {
   etype: Thrift.Type;
-  size: number;
+  size: number | bigint;
 }
 
 export interface TSet {
