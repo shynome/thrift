@@ -22,13 +22,13 @@ import { TTransport } from "./transport";
 export interface TMap {
   ktype: Thrift.Type;
   vtype: Thrift.Type;
-  size: number;
+  size: number | bigint;
 }
 
 export interface TMessage {
   fname: string;
   mtype: Thrift.MessageType;
-  rseqid: number;
+  rseqid: number | bigint;
 }
 
 export interface TField {

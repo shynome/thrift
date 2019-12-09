@@ -19,7 +19,8 @@
 
 import *as log from './log'
 import *as Thrift from './thrift';
-import { Type as ThriftType } from './thrift';
+import { TProtocol, TMessage, TStruct, TField, TMap, TList, TSet } from './protocol';
+import { TTransport } from './transport';
 
 var POW_8 = Math.pow(2, 8);
 var POW_24 = Math.pow(2, 24);
@@ -61,26 +62,7 @@ export enum TCompactProtocolTypes {
   CT_STRUCT = 0x0C,
 };
 
-export class TCompactProtocol {
-  public lastField_: number[] = [];
-  public lastFieldId_: number = 0;
-  public string_limit_ = 0;
-  public string_buf_: any = null;
-  public string_buf_size_ = 0;
-  public container_limit_ = 0;
-  public booleanField_ = {
-    name: null as null | string,
-    hasBoolValue: false,
-    fieldType: ThriftType.BOOL,
-    fieldId: null as any as number,
-  };
-  public boolValue_ = {
-    hasBoolValue: false,
-    boolValue: false
-  };
-  constructor(
-    public trans: any
-  ) { }
+export class TCompactProtocol implements TProtocol {
 
   /**
    * Compact Protocol ID number.
@@ -112,6 +94,26 @@ export class TCompactProtocol {
    */
   static readonly TYPE_SHIFT_AMOUNT = 5;
 
+  public lastField_: number[] = [];
+  public lastFieldId_: number = 0;
+  public string_limit_ = 0;
+  public string_buf_: any = null;
+  public string_buf_size_ = 0;
+  public container_limit_ = 0;
+  public booleanField_ = {
+    name: null as null | string,
+    hasBoolValue: false,
+    fieldType: Thrift.Type.BOOL,
+    fieldId: null as any as number,
+  };
+  public boolValue_ = {
+    hasBoolValue: false,
+    boolValue: false
+  };
+  constructor(
+    public trans: TTransport
+  ) { }
+
   //
   // Compact Protocol Utilities
   //
@@ -120,7 +122,7 @@ export class TCompactProtocol {
    * Returns the underlying transport layer.
    * @returns The underlying transport layer.
    */
-  getTransport() {
+  public getTransport(): TTransport {
     return this.trans
   }
 
@@ -130,7 +132,7 @@ export class TCompactProtocol {
    * @param ttype - Thrift type value
    * @returns Compact protocol type value
    */
-  getCompactType(ttype: ThriftType): TCompactProtocolTypes {
+  getCompactType(ttype: Thrift.Type): TCompactProtocolTypes {
     return ttype as number;
   }
 
@@ -140,39 +142,38 @@ export class TCompactProtocol {
    * @param type - Compact Protocol type value
    * @returns Thrift Type value
    */
-  getTType(type: number): ThriftType {
+  getTType(type: number): Thrift.Type {
     switch (type) {
-      case ThriftType.STOP:
-        return ThriftType.STOP;
+      case Thrift.Type.STOP:
+        return Thrift.Type.STOP;
       case TCompactProtocolTypes.CT_BOOLEAN_FALSE:
       case TCompactProtocolTypes.CT_BOOLEAN_TRUE:
-        return ThriftType.BOOL;
+        return Thrift.Type.BOOL;
       case TCompactProtocolTypes.CT_BYTE:
-        return ThriftType.BYTE;
+        return Thrift.Type.BYTE;
       case TCompactProtocolTypes.CT_I16:
-        return ThriftType.I16;
+        return Thrift.Type.I16;
       case TCompactProtocolTypes.CT_I32:
-        return ThriftType.I32;
+        return Thrift.Type.I32;
       case TCompactProtocolTypes.CT_I64:
-        return ThriftType.I64;
+        return Thrift.Type.I64;
       case TCompactProtocolTypes.CT_DOUBLE:
-        return ThriftType.DOUBLE;
+        return Thrift.Type.DOUBLE;
       case TCompactProtocolTypes.CT_BINARY:
-        return ThriftType.STRING;
+        return Thrift.Type.STRING;
       case TCompactProtocolTypes.CT_LIST:
-        return ThriftType.LIST;
+        return Thrift.Type.LIST;
       case TCompactProtocolTypes.CT_SET:
-        return ThriftType.SET;
+        return Thrift.Type.SET;
       case TCompactProtocolTypes.CT_MAP:
-        return ThriftType.MAP;
+        return Thrift.Type.MAP;
       case TCompactProtocolTypes.CT_STRUCT:
-        return ThriftType.STRUCT;
+        return Thrift.Type.STRUCT;
       default:
         throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.INVALID_DATA, "Unknown type: " + type);
     }
-    return ThriftType.STOP;
+    return Thrift.Type.STOP;
   };
-
 
   //
   // Compact Protocol write operations
@@ -181,7 +182,7 @@ export class TCompactProtocol {
   /**
    * Send any buffered bytes to the end point.
    */
-  flush() {
+  public flush(): void {
     return this.trans.flush();
   };
 
@@ -192,7 +193,7 @@ export class TCompactProtocol {
    * @param type - The type of message (CALL, REPLY, EXCEPTION, ONEWAY).
    * @param seqid - The call sequence number (if any).
    */
-  writeMessageBegin(name: string, type: number, seqid: number) {
+  public writeMessageBegin(name: string, type: Thrift.MessageType, seqid: number): void {
     this.writeByte(TCompactProtocol.PROTOCOL_ID);
     this.writeByte((TCompactProtocol.VERSION_N & TCompactProtocol.VERSION_MASK) |
       ((type << TCompactProtocol.TYPE_SHIFT_AMOUNT) & TCompactProtocol.TYPE_MASK));
@@ -207,14 +208,14 @@ export class TCompactProtocol {
       this.trans.setCurrSeqId(seqid);
     }
   };
-
-  writeMessageEnd() {
+  public writeMessageEnd(): void {
   };
-  writeStructBegin(name: any) {
+
+  public writeStructBegin(name: string): void {
     this.lastField_.push(this.lastFieldId_);
     this.lastFieldId_ = 0;
   };
-  writeStructEnd() {
+  public writeStructEnd(): void {
     // @ts-ignore
     this.lastFieldId_ = this.lastField_.pop();
   };
@@ -225,8 +226,8 @@ export class TCompactProtocol {
    * @param type - The field data type (a normal Thrift field Type).
    * @param id - The IDL field Id.
    */
-  writeFieldBegin(name: string, type: ThriftType, id: number) {
-    if (type != ThriftType.BOOL) {
+  public writeFieldBegin(name: string, type: Thrift.Type, id: number): void {
+    if (type != Thrift.Type.BOOL) {
       return this.writeFieldBeginInternal(name, type, id, -1);
     }
 
@@ -234,7 +235,7 @@ export class TCompactProtocol {
     this.booleanField_.fieldType = type;
     this.booleanField_.fieldId = id;
   };
-  writeFieldEnd() {
+  public writeFieldEnd(): void {
   };
   writeFieldStop() {
     this.writeByte(TCompactProtocolTypes.CT_STOP);
@@ -246,7 +247,7 @@ export class TCompactProtocol {
    * @param valType - The Thrift type of the map values.
    * @param size - The number of k/v pairs in the map.
    */
-  writeMapBegin(keyType: ThriftType, valType: ThriftType, size: number) {
+  public writeMapBegin(keyType: Thrift.Type, valType: Thrift.Type, size: number): void {
     if (size === 0) {
       this.writeByte(0);
     } else {
@@ -254,7 +255,7 @@ export class TCompactProtocol {
       this.writeByte(this.getCompactType(keyType) << 4 | this.getCompactType(valType));
     }
   };
-  writeMapEnd() {
+  public writeMapEnd(): void {
   };
 
   /**
@@ -262,24 +263,23 @@ export class TCompactProtocol {
    * @param elemType - The Thrift type of the list elements.
    * @param size - The number of elements in the list.
    */
-  writeListBegin(elemType: ThriftType, size: number) {
+  public writeListBegin(elemType: Thrift.Type, size: number): void {
     this.writeCollectionBegin(elemType, size);
   };
-  writeListEnd() {
-  };
+  public writeListEnd(): void { };
 
   /**
    * Writes a set collection header
    * @param elemType - The Thrift type of the set elements.
    * @param size - The number of elements in the set.
    */
-  writeSetBegin(elemType: ThriftType, size: number) {
+  public writeSetBegin(elemType: Thrift.Type, size: number): void {
     this.writeCollectionBegin(elemType, size);
   };
-  writeSetEnd() {
+  public writeSetEnd(): void {
   };
 
-  writeBool(value: any) {
+  public writeBool(value: boolean): void {
     if (this.booleanField_.name !== null) {
       // we haven't written the field header yet
       this.writeFieldBeginInternal(this.booleanField_.name,
@@ -295,24 +295,24 @@ export class TCompactProtocol {
     }
   };
 
-  writeByte(b: any) {
+  public writeByte(b: number): void {
     this.trans.write(new Buffer([b]));
   };
 
-  writeI16(i16: any) {
+  public writeI16(i16: number): void {
     this.writeVarint32(this.i32ToZigzag(i16));
   };
 
-  writeI32(i32: any) {
+  public writeI32(i32: number): void {
     this.writeVarint32(this.i32ToZigzag(i32));
   };
 
-  writeI64(i64: any) {
+  public writeI64(i64: number | bigint): void {
     this.writeVarint64(this.i64ToZigzag(i64));
   };
 
   // Little-endian, unlike TBinaryProtocol
-  writeDouble(v: any) {
+  public writeDouble(v: number): void {
     var buff = new Buffer(8);
     var m, e, c;
 
@@ -371,7 +371,7 @@ export class TCompactProtocol {
     this.trans.write(buff);
   };
 
-  writeStringOrBinary(name: any, encoding: any, arg: any) {
+  private writeStringOrBinary(name: string, encoding: 'utf8' | 'binary', arg: string | Buffer): void {
     if (typeof arg === 'string') {
       this.writeVarint32(Buffer.byteLength(arg, encoding));
       this.trans.write(new Buffer(arg, encoding));
@@ -387,11 +387,11 @@ export class TCompactProtocol {
     }
   };
 
-  writeString(arg: any) {
+  public writeString(arg: string | Buffer): void {
     this.writeStringOrBinary('writeString', 'utf8', arg);
   };
 
-  writeBinary(arg: any) {
+  public writeBinary(arg: string | Buffer): void {
     this.writeStringOrBinary('writeBinary', 'binary', arg);
   };
 
@@ -487,7 +487,7 @@ export class TCompactProtocol {
   // Compact Protocol read operations
   //
 
-  readMessageBegin() {
+  public readMessageBegin(): TMessage {
     //Read protocol ID
     var protocolId = this.trans.readByte();
     if (protocolId != TCompactProtocol.PROTOCOL_ID) {
@@ -510,21 +510,18 @@ export class TCompactProtocol {
 
     return { fname: name, mtype: type, rseqid: seqid };
   };
+  public readMessageEnd(): void { };
 
-  readMessageEnd() {
-  };
-
-  readStructBegin() {
+  public readStructBegin(): TStruct {
     this.lastField_.push(this.lastFieldId_);
     this.lastFieldId_ = 0;
     return { fname: '' };
   };
-
-  readStructEnd() {
+  public readStructEnd(): void {
     this.lastFieldId_ = this.lastField_.pop() as number;
   };
 
-  readFieldBegin() {
+  public readFieldBegin(): TField {
     var fieldId = 0;
     var b: any = this.trans.readByte(b);
     var type = (b & 0x0f);
@@ -556,11 +553,9 @@ export class TCompactProtocol {
     this.lastFieldId_ = fieldId;
     return { fname: null, ftype: fieldType, fid: fieldId };
   };
+  public readFieldEnd(): void { };
 
-  readFieldEnd() {
-  };
-
-  readMapBegin() {
+  public readMapBegin(): TMap {
     var msize = this.readVarint32();
     if (msize < 0) {
       throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative map size");
@@ -575,10 +570,9 @@ export class TCompactProtocol {
     var valType = this.getTType(kvType & 0xf);
     return { ktype: keyType, vtype: valType, size: msize };
   };
-  readMapEnd() {
-  };
+  public readMapEnd(): void { };
 
-  readListBegin() {
+  public readListBegin(): TList {
     var size_and_type = this.trans.readByte();
 
     var lsize = BigInt((size_and_type >>> 4) & 0x0000000f);
@@ -594,16 +588,15 @@ export class TCompactProtocol {
 
     return { etype: elemType, size: lsize };
   };
-  readListEnd() {
+  public readListEnd(): void {
   };
 
-  readSetBegin() {
+  public readSetBegin(): TSet {
     return this.readListBegin();
   };
-  readSetEnd() {
-  };
+  public readSetEnd(): void { };
 
-  readBool() {
+  public readBool(): boolean {
     var value = false;
     var rsize = 0;
     if (this.boolValue_.hasBoolValue === true) {
@@ -617,24 +610,24 @@ export class TCompactProtocol {
     return value;
   };
 
-  readByte() {
+  public readByte(): number {
     return this.trans.readByte();
   };
 
-  readI16() {
+  public readI16(): number {
     return this.readI32();
   };
 
-  readI32() {
+  public readI32(): number {
     return this.zigzagToI32(this.readVarint32());
   };
 
-  readI64() {
+  public readI64(): bigint {
     return this.zigzagToI64(this.readVarint64());
   };
 
   // Little-endian, unlike TBinaryProtocol
-  readDouble() {
+  public readDouble(): number {
     var buff = this.trans.read(8);
     var off = 0;
 
@@ -668,7 +661,7 @@ export class TCompactProtocol {
     return m * Math.pow(2, e - 52);
   };
 
-  readBinary() {
+  public readBinary(): Buffer {
     var size = this.readVarint32();
     if (size === 0n) {
       return new Buffer(0);
@@ -680,7 +673,7 @@ export class TCompactProtocol {
     return this.trans.read(size);
   };
 
-  readString() {
+  public readString(): string {
     var size = this.readVarint32();
     // Catch empty string case
     if (size === 0n) {
@@ -752,36 +745,36 @@ export class TCompactProtocol {
     return BigInt(n);
   };
 
-  skip(type: ThriftType) {
+  public skip(type: Thrift.Type): void {
     switch (type) {
-      case ThriftType.STOP:
+      case Thrift.Type.STOP:
         return;
-      case ThriftType.BOOL:
+      case Thrift.Type.BOOL:
         this.readBool();
         break;
-      case ThriftType.BYTE:
+      case Thrift.Type.BYTE:
         this.readByte();
         break;
-      case ThriftType.I16:
+      case Thrift.Type.I16:
         this.readI16();
         break;
-      case ThriftType.I32:
+      case Thrift.Type.I32:
         this.readI32();
         break;
-      case ThriftType.I64:
+      case Thrift.Type.I64:
         this.readI64();
         break;
-      case ThriftType.DOUBLE:
+      case Thrift.Type.DOUBLE:
         this.readDouble();
         break;
-      case ThriftType.STRING:
+      case Thrift.Type.STRING:
         this.readString();
         break;
-      case ThriftType.STRUCT:
+      case Thrift.Type.STRUCT:
         this.readStructBegin();
         while (true) {
           var r = this.readFieldBegin();
-          if (r.ftype === ThriftType.STOP) {
+          if (r.ftype === Thrift.Type.STOP) {
             break;
           }
           this.skip(r.ftype);
@@ -789,7 +782,7 @@ export class TCompactProtocol {
         }
         this.readStructEnd();
         break;
-      case ThriftType.MAP:
+      case Thrift.Type.MAP:
         var mapBegin = this.readMapBegin();
         for (var i = 0; i < mapBegin.size; ++i) {
           this.skip(mapBegin.ktype);
@@ -797,14 +790,14 @@ export class TCompactProtocol {
         }
         this.readMapEnd();
         break;
-      case ThriftType.SET:
+      case Thrift.Type.SET:
         var setBegin = this.readSetBegin();
         for (var i2 = 0; i2 < setBegin.size; ++i2) {
           this.skip(setBegin.etype);
         }
         this.readSetEnd();
         break;
-      case ThriftType.LIST:
+      case Thrift.Type.LIST:
         var listBegin = this.readListBegin();
         for (var i3 = 0; i3 < listBegin.size; ++i3) {
           this.skip(listBegin.etype);
