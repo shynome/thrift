@@ -25,7 +25,7 @@ import *as thrift from './thrift';
 import TBufferedTransport from './buffered_transport';
 import TBinaryProtocol from './binary_protocol';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
-import { ConnectOptions as BaseConnectOptions } from "./connection";
+import { ConnectOptions as BaseConnectOptions, TClientConstructor } from "./connection";
 
 import createClient from './create_client';
 import { TTransport, TTransportConstructor } from './transport';
@@ -250,7 +250,7 @@ export class HttpConnection extends EventEmitter {
  * @param options - The configuration options to use.
  * @returns  The connection object.
  */
-export function createHttpConnection(host: string, port: number, options: ConnectOptions) {
+export function createHttpConnection(host: string | undefined, port: number, options?: ConnectOptions): HttpConnection {
   options.host = host;
   options.port = port || 80;
   return new HttpConnection(options);
@@ -261,7 +261,7 @@ export function createHttpUDSConnection(path: string, options: ConnectOptions) {
   return new HttpConnection(options);
 };
 
-exports.createHttpClient = createClient
+export const createHttpClient: <TClient>(client: TClientConstructor<TClient>, connection: HttpConnection) => TClient = createClient as any
 
 class THTTPException extends thrift.TApplicationException {
   response: http.IncomingMessage

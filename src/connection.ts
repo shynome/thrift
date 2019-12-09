@@ -285,7 +285,7 @@ export class Connection extends EventEmitter {
 
 }
 
-export function createConnection(host: string, port: number, options: ConnectOptions) {
+export function createConnection(host: string | undefined, port: number, options?: ConnectOptions): Connection {
   var stream = net.createConnection(port, host);
   var connection = new Connection(stream, options);
   connection.host = host;
@@ -302,7 +302,7 @@ export function createUDSConnection(path: string, options: ConnectOptions) {
   return connection;
 };
 
-export function createSSLConnection(host: string, port: number, options: ConnectOptions) {
+export function createSSLConnection(host: string | undefined, port: number, options?: ConnectOptions): Connection {
   if (!('secureProtocol' in options) && !('secureOptions' in options)) {
     // @ts-ignore
     options.secureProtocol = "SSLv23_method";
@@ -430,6 +430,4 @@ export function createStdIOConnection(command: string, options: StdIOConnectionO
   return new StdIOConnection(command, options);
 };
 
-export {
-  createClient as createStdIOClient
-}
+export const createStdIOClient: <TClient>(client: TClientConstructor<TClient>, connection: Connection) => TClient = createClient as any

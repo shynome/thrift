@@ -24,7 +24,7 @@ import TJSONProtocol from './json_protocol';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
 
 import createClient from './create_client';
-import { SeqId2Service, ConnectOptions as BaseConnectOptions } from "./connection";
+import { SeqId2Service, ConnectOptions as BaseConnectOptions, TClientConstructor, Connection } from "./connection";
 import { TProtocol, TProtocolConstructor } from "./protocol";
 import { TTransport, TTransportConstructor } from "./transport";
 
@@ -272,8 +272,8 @@ export class XHRConnection extends EventEmitter {
  * Creates a new TXHRTransport object, used by Thrift clients to connect
  *    to Thrift HTTP based servers.
  */
-export const createXHRConnection = function (options: XHRConnectionOptions) {
+export const createXHRConnection = function (options: XHRConnectionOptions): XHRConnection {
   return new XHRConnection(options);
 };
 
-export const createXHRClient = createClient;
+export const createXHRClient: <TClient>(client: TClientConstructor<TClient>, connection: XHRConnection) => TClient = createClient as any;

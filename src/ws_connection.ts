@@ -23,7 +23,7 @@ import *as thrift from './thrift';
 import TBufferedTransport from './buffered_transport';
 import TJSONProtocol from './json_protocol';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
-import { ConnectOptions as BaseConnectOptions, SeqId2Service } from "./connection";
+import { ConnectOptions as BaseConnectOptions, SeqId2Service, TClientConstructor } from "./connection";
 
 import createClient from './create_client';
 import { TTransportConstructor } from './transport';
@@ -292,10 +292,8 @@ export class WSConnection extends EventEmitter {
  * @returns The connection object.
  * @see {@link WSConnectOptions}
  */
-export function createWSConnection(host: string, port: number, options: WSConnectOptions) {
+export function createWSConnection(host: string | undefined, port: number, options?: WSConnectOptions): WSConnection {
   return new WSConnection(host, port, options);
 };
 
-export {
-  createClient as createWSClient
-};
+export const createWSClient: <TClient>(client: TClientConstructor<TClient>, connection: WSConnection) => TClient = createClient as any

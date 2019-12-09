@@ -17,13 +17,15 @@
  * under the License.
  */
 
+import { TClientConstructor, Connection } from "./connection";
+
 /**
  * Creates a new client object for the specified Thrift service.
  * @param ServiceClient - The module containing the generated service client
  * @param Connection - The connection to use.
  * @returns The client object.
  */
-export function createClient(ServiceClient: any, connection: any): object {
+export function createClient<TClient>(ServiceClient: TClientConstructor<TClient>, connection: Connection): TClient {
   // TODO validate required options and throw otherwise
   if (ServiceClient.Client) {
     ServiceClient = ServiceClient.Client;
