@@ -19,37 +19,36 @@
 import { EventEmitter } from "events";
 import *as thrift from './thrift';
 
-var TBufferedTransport = require('./buffered_transport');
-var TJSONProtocol = require('./json_protocol');
-var InputBufferUnderrunError = require('./input_buffer_underrun_error');
+import TBufferedTransport from './buffered_transport';
+import TJSONProtocol from './json_protocol';
+import InputBufferUnderrunError from './input_buffer_underrun_error';
 
-var createClient = require('./create_client');
+import createClient from './create_client';
+import { SeqId2Service, ConnectOptions as BaseConnectOptions } from "./connection";
+import { TProtocol, TProtocolConstructor } from "./protocol";
+import { TTransport, TTransportConstructor } from "./transport";
 
-export interface XHRConnectionOptions {
-  url: string
-  useCORS: boolean
-  transport: any
-  protocol: any
-  headers: { [k: string]: any }
-  https: boolean
-  path: string
+export interface XHRConnectionOptions extends BaseConnectOptions {
+  url?: string
+  useCORS?: boolean
 }
 
 export class XHRConnection extends EventEmitter {
-  url: string
-  client: any
-  options = {};
-  wpos = 0;
-  rpos = 0;
-  useCORS = false;
-  send_buf = '';
-  recv_buf = '';
-  transport = TBufferedTransport;
-  protocol = TJSONProtocol;
-  headers: XHRConnectionOptions['headers'] = {};
   //The sequence map is used to map seqIDs back to the
   //  calling client in multiplexed scenarios
-  seqId2Service: { [k: string]: any } = {};
+  seqId2Service: SeqId2Service = {};
+  options: XHRConnectionOptions;
+  wpos: number;
+  rpos: number;
+  useCORS: boolean = false;
+  send_buf: string;
+  recv_buf: string;
+  transport: TTransportConstructor = TBufferedTransport;
+  protocol: TProtocolConstructor = TJSONProtocol;
+  headers: thrift.HttpHeaders;
+
+  url: string
+  client: any
   /**
    * Constructor Function for the XHR Connection.
    * If you do not specify a host and port then XHRConnection will default to the
@@ -79,9 +78,9 @@ export class XHRConnection extends EventEmitter {
 
   /**
     * Gets the browser specific XmlHttpRequest Object.
-    * @returns {object} the browser XHR interface object
+    * @returns the browser XHR interface object
     */
-  getXmlHttpRequestObject() {
+  getXmlHttpRequestObject(): XMLHttpRequest {
     try { return new XMLHttpRequest(); } catch (e1) { }
     try { return new ActiveXObject('Msxml2.XMLHTTP'); } catch (e2) { }
     try { return new ActiveXObject('Microsoft.XMLHTTP'); } catch (e3) { }
@@ -97,13 +96,12 @@ export class XHRConnection extends EventEmitter {
    * the URL is an empty string, the current send buffer is returned.
    * @param {object} async - If true the current send buffer is returned.
    * @param {object} callback - Optional async completion callback
-   * @returns {undefined|string} Nothing or the current send buffer.
-   * @throws {string} If XHR fails.
    */
-  flush() {
+  flush(): void {
     var self = this;
     if (this.url === undefined || this.url === '') {
-      return this.send_buf;
+      this.send_buf;
+      return
     }
 
     var xreq = this.getXmlHttpRequestObject();
@@ -121,6 +119,7 @@ export class XHRConnection extends EventEmitter {
     xreq.open('POST', this.url, true);
 
     Object.keys(this.headers).forEach(function (headerKey) {
+      //@ts-ignore 
       xreq.setRequestHeader(headerKey, self.headers[headerKey]);
     });
 
@@ -130,9 +129,9 @@ export class XHRConnection extends EventEmitter {
   recv_buf_sz: number = 0
   /**
    * Sets the buffer to provide the protocol when deserializing.
-   * @param {string} buf - The buffer to supply the protocol.
+   * @param buf - The buffer to supply the protocol.
    */
-  setRecvBuffer(buf: string) {
+  setRecvBuffer(buf: string): void {
     this.recv_buf = buf;
     this.recv_buf_sz = this.recv_buf.length;
     this.wpos = this.recv_buf.length;
@@ -148,7 +147,7 @@ export class XHRConnection extends EventEmitter {
 
   };
 
-  __decodeCallback(transport_with_data: any) {
+  private __decodeCallback(transport_with_data: any) {
     var proto = new this.protocol(transport_with_data);
     try {
       while (true) {
@@ -204,18 +203,18 @@ export class XHRConnection extends EventEmitter {
   /**
    * Returns true if the transport is open, XHR always returns true.
    * @readonly
-   * @returns {boolean} Always True.
+   * @returns Always True.
    */
-  isOpen() { return true; };
+  isOpen(): boolean { return true; };
 
   /**
    * Opens the transport connection, with XHR this is a nop.
    */
-  open() { };
+  open(): void { };
   /**
    * Closes the transport connection, with XHR this is a nop.
    */
-  close() { };
+  close(): void { };
 
   read_buf: any
   /**
@@ -246,15 +245,15 @@ export class XHRConnection extends EventEmitter {
 
   /**
    * Returns the entire response buffer.
-   * @returns {string} Characters sent by the server.
+   * @returns Characters sent by the server.
    */
-  readAll() { return this.recv_buf; };
+  readAll(): string { return this.recv_buf; };
 
   /**
    * Sets the send buffer to buf.
    * @param {string} buf - The buffer to send.
    */
-  write(buf: string) {
+  write(buf: string): void {
     this.send_buf = buf;
     this.flush();
   };
@@ -262,9 +261,9 @@ export class XHRConnection extends EventEmitter {
   /**
    * Returns the send buffer.
    * @readonly
-   * @returns {string} The send buffer.
+   * @returns The send buffer.
    */
-  getSendBuffer() { return this.send_buf; };
+  getSendBuffer(): string { return this.send_buf; };
 
 }
 
