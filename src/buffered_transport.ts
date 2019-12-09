@@ -19,9 +19,24 @@
 
 import *as binary from './binary';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
-import { TTransport } from "./transport";
+import { TTransport, TTransportConstructor } from "./transport";
 
 export class TBufferedTransport implements TTransport {
+  static receiver = function (callback: any, seqid: number) {
+    var reader = new TBufferedTransport();
+
+    return function (data: Buffer) {
+      if (reader.writeCursor + data.length > reader.inBuf.length) {
+        var buf = new Buffer(reader.writeCursor + data.length);
+        reader.inBuf.copy(buf, 0, 0, reader.writeCursor);
+        reader.inBuf = buf;
+      }
+      data.copy(reader.inBuf, reader.writeCursor, 0);
+      reader.writeCursor += data.length;
+
+      callback(reader, seqid);
+    };
+  };
   defaultReadBufferSize = 1024;
   writeBufferSize = 512; // Soft Limit
   inBuf = new Buffer(this.defaultReadBufferSize);
@@ -40,21 +55,7 @@ export class TBufferedTransport implements TTransport {
     this.outBuffers = [];
     this.outCount = 0;
   }
-  receiver = function (callback: any, seqid: number) {
-    var reader = new TBufferedTransport();
 
-    return function (data: Buffer) {
-      if (reader.writeCursor + data.length > reader.inBuf.length) {
-        var buf = new Buffer(reader.writeCursor + data.length);
-        reader.inBuf.copy(buf, 0, 0, reader.writeCursor);
-        reader.inBuf = buf;
-      }
-      data.copy(reader.inBuf, reader.writeCursor, 0);
-      reader.writeCursor += data.length;
-
-      callback(reader, seqid);
-    };
-  };
   commitPosition() {
     var unreadSize = this.writeCursor - this.readCursor;
     var bufSize = (unreadSize * 2 > this.defaultReadBufferSize) ?

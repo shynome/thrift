@@ -25,8 +25,11 @@ import *as thrift from './thrift';
 import TBufferedTransport from './buffered_transport';
 import TBinaryProtocol from './binary_protocol';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
+import { ConnectOptions as BaseConnectOptions } from "./connection";
 
 import createClient from './create_client';
+import { TTransport, TTransportConstructor } from './transport';
+import { TProtocol, TProtocolConstructor } from './protocol';
 
 /**
  * @example
@@ -45,36 +48,11 @@ import createClient from './create_client';
  *     var client = thrift.createHttpClient(myService, connection);
  *     client.myServiceFunction();
  */
-export interface ConnectOptions {
-  /**The Thrift layered transport to use (TBufferedTransport, etc). */
-  transport: any
-  /**The Thrift serialization protocol to use (TBinaryProtocol, etc.). */
-  protocol: any
-  /**The URL path to POST to (e.g. "/", "/mySvc", "/thrift/quoteSvc", etc.). */
-  path: string
-  /**
-   * A standard Node.js header hash, an object hash containing key/value
-   * pairs where the key is the header name string and the value is the header value string.
-   */
-  headers: object
-  /**True causes the connection to use https, otherwise http is used. */
-  https: boolean
-  /**Options passed on to node. */
-  nodeOptions: {
-    [k: string]: any
-    host: ConnectOptions['host'],
-    port: ConnectOptions['port'],
-    socketPath: ConnectOptions['socketPath'],
-    path: ConnectOptions['path'],
-    method: string,
-    headers: { [k: string]: any },
-    responseType: ConnectOptions['responseType']
-  }
-
-  host: string
-  port: number
-  socketPath: string
-  responseType: string | null
+export interface ConnectOptions extends BaseConnectOptions {
+  host?: string
+  port?: number
+  socketPath?: string
+  responseType?: string | null
 }
 
 /**
@@ -90,12 +68,14 @@ export interface ConnectOptions {
  * @see {@link createHttpConnection}
  */
 export class HttpConnection extends EventEmitter {
-  host: ConnectOptions['host']
-  port: ConnectOptions['port']
+  options: ConnectOptions;
+  host: string;
+  port: number;
+  https: boolean;
+  transport: TTransportConstructor;
+  protocol: TProtocolConstructor;
+
   socketPath: ConnectOptions['socketPath']
-  https: ConnectOptions['https']
-  transport: ConnectOptions['transport']
-  protocol: ConnectOptions['protocol']
   nodeOptions: ConnectOptions['nodeOptions']
   client: any = {}
   /**
@@ -107,9 +87,10 @@ export class HttpConnection extends EventEmitter {
    * @param {ConnectOptions} options - The configuration options to use.
    */
   constructor(
-    public options: ConnectOptions = {} as any
+    options: ConnectOptions = {}
   ) {
     super()
+    this.options = options
     this.host = this.options.host;
     this.port = this.options.port;
     this.socketPath = this.options.socketPath;
@@ -125,9 +106,11 @@ export class HttpConnection extends EventEmitter {
       path: this.options.path || '/',
       method: 'POST',
       headers: this.options.headers || {},
+      // @ts-ignore
       responseType: this.options.responseType || null
     };
     for (var attrname in this.options.nodeOptions) {
+      // @ts-ignore
       this.nodeOptions[attrname] = this.options.nodeOptions[attrname];
     }
     /*jshint -W069 */
