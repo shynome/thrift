@@ -17,14 +17,15 @@
  * under the License.
  */
 import *as Thrift from './thrift';
+import { TProtocol } from './protocol';
 
 export class MultiplexedProcessor {
   services: { [k: string]: any } = {};
-  constructor(stream: any, options: any) { }
+  constructor(stream?: any, options?: any) { }
   registerProcessor(name: string, handler: any) {
     this.services[name] = handler;
   };
-  process(inp: any, out: any) {
+  process(inp: TProtocol, out: TProtocol) {
     var begin = inp.readMessageBegin();
 
     if (begin.mtype != Thrift.MessageType.CALL && begin.mtype != Thrift.MessageType.ONEWAY) {
@@ -44,6 +45,7 @@ export class MultiplexedProcessor {
     var inpProxy: any = {};
 
     for (var attr in inp) {
+      // @ts-ignore
       inpProxy[attr] = inp[attr];
     }
 
