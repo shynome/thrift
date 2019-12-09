@@ -17,22 +17,30 @@
  * under the License.
  */
 
-export interface TTransport {
-  commitPosition(): void;
-  rollbackPosition(): void;
-  isOpen(): boolean;
-  open(): boolean;
-  close(): boolean;
-  setCurrSeqId(seqId: number): void;
-  ensureAvailable(len: number): void;
-  read(len: number): Buffer;
-  readByte(): number;
-  readI16(): number;
-  readI32(): number;
-  readDouble(): number;
-  readString(): string;
-  write(buf: Buffer | string): void;
-  flush(): void;
+export abstract class TTransport {
+  public abstract commitPosition(): void;
+  public abstract rollbackPosition(): void;
+  public abstract isOpen(): boolean;
+  public abstract open(): boolean;
+  public abstract close(): boolean;
+  public abstract setCurrSeqId(seqId: number): void;
+  public abstract ensureAvailable(len: number): void;
+  public abstract read(len: number): Buffer;
+  public abstract readByte(): number;
+  public abstract readI16(): number;
+  public abstract readI32(): number;
+  public abstract readDouble(): number;
+  public abstract readString(): string;
+  public abstract write(buf: Buffer | string): void;
+  public abstract flush(): void;
+  public abstract borrow(): TransBuf
+  public abstract consume(bytesConsumed: number): void
+}
+
+export interface TransBuf {
+  buf: Buffer
+  readIndex: number
+  writeIndex: number
 }
 
 export type TTransportCallback = (msg?: Buffer, seqid?: number) => void;

@@ -65,7 +65,7 @@ export class TCompactProtocol {
   public lastField_: number[] = [];
   public lastFieldId_: number = 0;
   public string_limit_ = 0;
-  public string_buf_ = null;
+  public string_buf_: any = null;
   public string_buf_size_ = 0;
   public container_limit_ = 0;
   public booleanField_ = {

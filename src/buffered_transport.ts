@@ -127,12 +127,12 @@ export class TBufferedTransport implements TTransport {
     return str;
   };
 
-  borrow() {
+  public borrow() {
     var obj = { buf: this.inBuf, readIndex: this.readCursor, writeIndex: this.writeCursor };
     return obj;
   };
 
-  consume(bytesConsumed: number) {
+  public consume(bytesConsumed: number) {
     this.readCursor += bytesConsumed;
   };
 

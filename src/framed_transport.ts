@@ -170,7 +170,7 @@ export class TFramedTransport implements TTransport {
     this.outCount = 0;
   };
 
-  private borrow() {
+  public borrow() {
     return {
       buf: this.inBuf,
       readIndex: this.readPos,
@@ -178,7 +178,7 @@ export class TFramedTransport implements TTransport {
     };
   };
 
-  private consume(bytesConsumed: number) {
+  public consume(bytesConsumed: number) {
     this.readPos += bytesConsumed;
   };
 

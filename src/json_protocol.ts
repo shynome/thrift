@@ -602,7 +602,6 @@ export class TJSONProtocol implements TProtocol {
     }
   };
 
-
   /**
    * Deserializes the beginning of a map.
    */
