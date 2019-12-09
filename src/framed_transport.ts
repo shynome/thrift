@@ -19,21 +19,22 @@
 
 import *as binary from './binary';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
+import { TTransport, TTransportCallback } from "./transport";
 
-export class TFramedTransport {
+export class TFramedTransport implements TTransport {
   outBuffers: Buffer[] = [];
   inBuf: Buffer = null as any
   outCount = 0;
   readPos = 0;
   constructor(
     public buffer: Buffer = new Buffer(0),
-    public onFlush: Function = () => 1,
+    public onFlush: TTransportCallback = () => 1,
   ) { }
 
-  receiver(callback: Function, seqid: number) {
+  static receiver(callback: (trans: TFramedTransport, seqid: number) => void, seqid: number): (data: Buffer) => void {
     var residual: any = null;
 
-    return function (data: any) {
+    return function (data: Buffer): void {
       // Prepend any residual data from our previous read
       if (residual) {
         data = Buffer.concat([residual, data]);
@@ -65,28 +66,28 @@ export class TFramedTransport {
     };
   };
 
-  commitPosition() { }
-  rollbackPosition() { }
+  commitPosition(): void { }
+  rollbackPosition(): void { }
 
   // TODO: Implement open/close support
-  isOpen() { return true; };
-  open() { };
-  close() { };
+  isOpen(): boolean { return true; };
+  open(): boolean { return true };
+  close(): boolean { return true };
 
-  private _seqid: number | null = null
+  private _seqid: number = null
   // Set the seqid of the message in the client
   // So that callbacks can be found
-  setCurrSeqId(seqid: number) {
+  setCurrSeqId(seqid: number): void {
     this._seqid = seqid;
   };
 
-  ensureAvailable(len: number) {
+  ensureAvailable(len: number): void {
     if (this.readPos + len > this.inBuf.length) {
       throw new InputBufferUnderrunError();
     }
   };
 
-  read(len: number) { // this function will be used for each frames.
+  read(len: number): Buffer { // this function will be used for each frames.
     this.ensureAvailable(len);
     var end = this.readPos + len;
 
@@ -100,53 +101,40 @@ export class TFramedTransport {
   };
 
 
-  readByte() {
+  readByte(): number {
     this.ensureAvailable(1);
     return binary.readByte(this.inBuf[this.readPos++]);
   };
 
-  readI16() {
+  readI16(): number {
     this.ensureAvailable(2);
     var i16 = binary.readI16(this.inBuf, this.readPos);
     this.readPos += 2;
     return i16;
   };
 
-  readI32() {
+  readI32(): number {
     this.ensureAvailable(4);
     var i32 = binary.readI32(this.inBuf, this.readPos);
     this.readPos += 4;
     return i32;
   };
 
-  readDouble() {
+  readDouble(): number {
     this.ensureAvailable(8);
     var d = binary.readDouble(this.inBuf, this.readPos);
     this.readPos += 8;
     return d;
   };
 
-  readString(len: number) {
+  readString(len?: number): string {
     this.ensureAvailable(len);
     var str = this.inBuf.toString('utf8', this.readPos, this.readPos + len);
     this.readPos += len;
     return str;
   };
 
-
-  borrow() {
-    return {
-      buf: this.inBuf,
-      readIndex: this.readPos,
-      writeIndex: this.inBuf.length
-    };
-  };
-
-  consume(bytesConsumed: number) {
-    this.readPos += bytesConsumed;
-  };
-
-  write(buf: Buffer, encoding = 'utf8') {
+  write(buf: Buffer, encoding = 'utf8'): void {
     if (typeof (buf) === "string") {
       buf = new Buffer(buf, encoding as any);
     }
@@ -154,7 +142,7 @@ export class TFramedTransport {
     this.outCount += buf.length;
   };
 
-  flush() {
+  flush(): void {
     // If the seqid of the callback is available pass it to the onFlush
     // Then remove the current seqid
     var seqid = this._seqid;
@@ -181,6 +169,19 @@ export class TFramedTransport {
     this.outBuffers = [];
     this.outCount = 0;
   };
+
+  private borrow() {
+    return {
+      buf: this.inBuf,
+      readIndex: this.readPos,
+      writeIndex: this.inBuf.length
+    };
+  };
+
+  private consume(bytesConsumed: number) {
+    this.readPos += bytesConsumed;
+  };
+
 
 }
 
