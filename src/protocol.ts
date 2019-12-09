@@ -103,6 +103,10 @@ export interface TProtocol {
   skip(type: Thrift.Type): void;
 }
 
+export interface TProtocolConstructor {
+  new(trans: TTransport, strictRead?: boolean, strictWrite?: boolean): TProtocol;
+}
+
 export { TBinaryProtocol } from './binary_protocol';
 export { TCompactProtocol } from './compact_protocol';
 export { TJSONProtocol } from './json_protocol';

@@ -21,6 +21,7 @@ import constants from 'constants';
 import net from 'net';
 import tls from 'tls';
 import *as thrift from './thrift';
+import { HttpHeaders } from './thrift';
 import *as log from './log';
 
 import TBufferedTransport from './buffered_transport';
@@ -28,40 +29,59 @@ import TBinaryProtocol from './binary_protocol';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
 
 import createClient from './create_client';
+import { TTransportConstructor, TTransport } from "./transport";
+import { TProtocolConstructor, TProtocol } from "./protocol";
+import http from "http";
+import https from "https";
 
 import *as binary from './binary';
 
-interface ConnectionOptins {
-  max_attempts?: number
-  secureProtocol?: string
-  secureOptions?: number
+export interface SeqId2Service {
+  [seqid: number]: string;
+}
+
+export interface ConnectOptions {
+  transport?: TTransportConstructor;
+  protocol?: TProtocolConstructor;
+  path?: string;
+  headers?: HttpHeaders;
+  https?: boolean;
+  debug?: boolean;
+  max_attempts?: number;
+  retry_max_delay?: number;
+  connect_timeout?: number;
+  timeout?: number;
+  nodeOptions?: http.RequestOptions | https.RequestOptions;
 }
 
 class Connection extends EventEmitter {
-  seqId2Service: any = {};
+  seqId2Service: SeqId2Service = {};
   connection: net.Socket;
+  ssl: boolean;
+  options: ConnectOptions;
+  transport: TTransport;
+  protocol: TProtocol;
+  offline_queue: Buffer[] = [];
+  connected: boolean = false;
+
   host?: string
   port?: number
   path?: string
-  ssl: any;
-  options: any;
-  transport: any;
-  protocol: any;
-  offline_queue: any[] = [];
-  connected = false;
   _debug: boolean
   max_attempts: number | undefined
   retry_max_delay: number | null = null
   connect_timeout: number | boolean = false
   client: any
-  constructor(stream: any, options: ConnectionOptins = {}) {
+  constructor(stream: net.Socket, options: ConnectOptions = {}) {
     super()
     var self = this;
 
     this.connection = stream;
-    this.ssl = (stream.encrypted);
+    this.ssl = !!(stream as any).encrypted;
     this.options = options;
+    // @ts-ignore
     this.transport = this.options.transport || TBufferedTransport;
+    // @ts-ignore
     this.protocol = this.options.protocol || TBinaryProtocol;
     this.initialize_retry_vars();
 
@@ -183,24 +203,24 @@ class Connection extends EventEmitter {
   destroy() {
     this.connection.destroy();
   };
-  write(data: any) {
-    if (!this.connected) {
-      this.offline_queue.push(data);
-      return;
-    }
-    this.connection.write(data);
-  };
-  retry_timer: NodeJS.Timeout | null = null
-  retry_totaltime = 0;
-  retry_delay = 150;
-  retry_backoff = 1.7;
-  attempts = 0;
+  private retry_timer: NodeJS.Timeout | null = null
+  private retry_totaltime = 0;
+  private retry_delay = 150;
+  private retry_backoff = 1.7;
+  private attempts = 0;
   initialize_retry_vars() {
     this.retry_timer = null;
     this.retry_totaltime = 0;
     this.retry_delay = 150;
     this.retry_backoff = 1.7;
     this.attempts = 0;
+  };
+  write(data: Buffer) {
+    if (!this.connected) {
+      this.offline_queue.push(data);
+      return;
+    }
+    this.connection.write(data);
   };
 
   connection_gone() {
@@ -261,7 +281,7 @@ class Connection extends EventEmitter {
 
 }
 
-export function createConnection(host: string, port: number, options: ConnectionOptins) {
+export function createConnection(host: string, port: number, options: ConnectOptions) {
   var stream = net.createConnection(port, host);
   var connection = new Connection(stream, options);
   connection.host = host;
@@ -270,7 +290,7 @@ export function createConnection(host: string, port: number, options: Connection
   return connection;
 };
 
-export function createUDSConnection(path: string, options: ConnectionOptins) {
+export function createUDSConnection(path: string, options: ConnectOptions) {
   var stream = net.createConnection(path);
   var connection = new Connection(stream, options);
   connection.path = path;
@@ -278,9 +298,11 @@ export function createUDSConnection(path: string, options: ConnectionOptins) {
   return connection;
 };
 
-export function createSSLConnection(host: string, port: number, options: ConnectionOptins) {
+export function createSSLConnection(host: string, port: number, options: ConnectOptions) {
   if (!('secureProtocol' in options) && !('secureOptions' in options)) {
+    // @ts-ignore
     options.secureProtocol = "SSLv23_method";
+    // @ts-ignore
     options.secureOptions = constants.SSL_OP_NO_SSLv2 | constants.SSL_OP_NO_SSLv3;
   }
 
@@ -313,7 +335,7 @@ export class StdIOConnection extends EventEmitter {
   offline_queue: any[] = [];
   frameLeft = 0;
   framePos = 0;
-  frame = null;
+  frame: any = null;
   connected = false
   client: any
   constructor(command: string, options: StdIOConnectionOptions) {

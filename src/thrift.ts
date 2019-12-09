@@ -61,6 +61,10 @@ export enum TApplicationExceptionType {
   UNSUPPORTED_CLIENT_TYPE = 10
 };
 
+export interface HttpHeaders {
+  [name: string]: number | string | string[] | undefined;
+}
+
 export class TApplicationException extends TException {
   public type: TApplicationExceptionType
   constructor(

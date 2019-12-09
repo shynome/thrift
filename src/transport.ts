@@ -35,6 +35,12 @@ export interface TTransport {
   flush(): void;
 }
 
+export type TTransportCallback = (msg?: Buffer, seqid?: number) => void;
+
+export interface TTransportConstructor {
+  new(buffer?: Buffer, callback?: TTransportCallback): TTransport;
+}
+
 export { TBufferedTransport } from './buffered_transport';
 export { TFramedTransport } from './framed_transport';
 export { InputBufferUnderrunError } from './input_buffer_underrun_error';
