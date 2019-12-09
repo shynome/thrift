@@ -17,6 +17,13 @@
  * under the License.
  */
 
-export const toDecimalString = (i64: BigInt) => i64.toString()
+export const toDecimalString = (i64: bigint) => i64.toString()
 
 export const fromDecimalString = (text: string) => BigInt(text)
+
+export const i642Buffer = (_i64: number | bigint) => {
+  let i64 = BigInt(_i64)
+  let b = Buffer.allocUnsafe(8)
+  b.writeBigInt64BE(i64)
+  return b
+}

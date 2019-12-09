@@ -3,6 +3,7 @@
     "target": "esnext",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
+    "strictNullChecks": false,
     "strict": true,
   }
 }

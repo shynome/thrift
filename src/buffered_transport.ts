@@ -19,8 +19,9 @@
 
 import *as binary from './binary';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
+import { TTransport } from "./transport";
 
-export class TBufferedTransport {
+export class TBufferedTransport implements TTransport {
   defaultReadBufferSize = 1024;
   writeBufferSize = 512; // Soft Limit
   inBuf = new Buffer(this.defaultReadBufferSize);
@@ -73,8 +74,8 @@ export class TBufferedTransport {
   isOpen() {
     return true;
   };
-  open = function () { };
-  close = function () { };
+  open() { return true };
+  close() { return true };
   private _seqid: number | null = null;
   // Set the seqid of the message in the client
   // So that callbacks can be found
@@ -118,7 +119,7 @@ export class TBufferedTransport {
   };
 
 
-  readString(len: number) {
+  readString(len: number = 0) {
     this.ensureAvailable(len);
     var str = this.inBuf.toString('utf8', this.readCursor, this.readCursor + len);
     this.readCursor += len;

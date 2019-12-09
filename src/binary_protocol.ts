@@ -20,7 +20,9 @@
 import *as log from './log'
 import *as binary from './binary';
 import *as Thrift from './thrift';
-import { Type as ThriftType } from './thrift';
+import { TProtocol, TField, TMessage, TStruct, TMap, TList, TSet } from "./protocol";
+import { TTransport } from './transport';
+import { i642Buffer } from "./int64_util";
 
 // JavaScript supports only numeric doubles, therefore even hex values are always signed.
 // The largest integer value which can be represented in JavaScript is +/-2^53.
@@ -30,19 +32,19 @@ const VERSION_MASK = -65536   // 0xffff0000
 const VERSION_1 = -2147418112 // 0x80010000
 const TYPE_MASK = 0x000000ff;
 
-export class TBinaryProtocol {
+export class TBinaryProtocol implements TProtocol {
   constructor(
-    public trans: any,
+    public trans: TTransport,
     public strictRead = false,
     public strictWrite = true,
   ) {
 
   }
-  _seqid: number | null = null;
+  _seqid: number = null;
   flush() {
     return this.trans.flush();
   };
-  writeMessageBegin(name: string, type: any, seqid: number) {
+  writeMessageBegin(name: string, type: Thrift.MessageType, seqid: number) {
     if (this.strictWrite) {
       this.writeI32(VERSION_1 | type);
       this.writeString(name);
@@ -68,73 +70,58 @@ export class TBinaryProtocol {
     }
   };
 
-  writeStructBegin(name: string) {
-  };
-  writeStructEnd() {
-  };
+  writeStructBegin(name: string) { };
+  writeStructEnd() { };
 
 
-  writeFieldBegin(name: string, type: any, id: number) {
+  writeFieldBegin(name: string, type: Thrift.Type, id: number) {
     this.writeByte(type);
     this.writeI16(id);
   };
-
-  writeFieldEnd() {
-  };
-
+  writeFieldEnd() { };
   writeFieldStop() {
-    this.writeByte(ThriftType.STOP);
+    this.writeByte(Thrift.Type.STOP);
   };
 
-  writeMapBegin(ktype: any, vtype: any, size: number) {
+  writeMapBegin(ktype: Thrift.Type, vtype: Thrift.Type, size: number) {
     this.writeByte(ktype);
     this.writeByte(vtype);
     this.writeI32(size);
   };
+  writeMapEnd() { };
 
-  writeMapEnd() {
-  };
-
-  writeListBegin(etype: any, size: number) {
+  writeListBegin(etype: Thrift.Type, size: number) {
     this.writeByte(etype);
     this.writeI32(size);
   };
+  writeListEnd() { };
 
-  writeListEnd() {
-  };
-
-  writeSetBegin(etype: any, size: number) {
+  writeSetBegin(etype: Thrift.Type, size: number) {
     this.writeByte(etype);
     this.writeI32(size);
   };
-
-  writeSetEnd() {
-  };
-
+  writeSetEnd() { };
 
   writeBool(bool: boolean) {
     this.writeByte(bool ? 1 : 0);
   };
-  writeByte(b: any) {
+  writeByte(b: number) {
     this.trans.write(new Buffer([b]));
   };
-  writeI16(i16: any) {
+  writeI16(i16: number) {
     this.trans.write(binary.writeI16(new Buffer(2), i16));
   };
-  writeI32(i32: any) {
+  writeI32(i32: number) {
     this.trans.write(binary.writeI32(new Buffer(4), i32));
   };
-  writeI64(i64: any) {
-    if (i64.buffer) {
-      this.trans.write(i64.buffer);
-    } else {
-      this.trans.write(BigInt(i64));
-    }
+  writeI64(i64: number | bigint) {
+    let buf = i642Buffer(i64)
+    this.trans.write(buf)
   };
-  writeDouble(dub: any) {
+  writeDouble(dub: number) {
     this.trans.write(binary.writeDouble(new Buffer(8), dub));
   };
-  writeStringOrBinary(name: string, encoding: string, arg: any) {
+  writeStringOrBinary(name: string, encoding: string, arg: string | Buffer) {
     if (typeof (arg) === 'string') {
       this.writeI32(Buffer.byteLength(arg, encoding as any));
       this.trans.write(new Buffer(arg, encoding as any));
@@ -149,15 +136,14 @@ export class TBinaryProtocol {
       throw new Error(name + ' called without a string/Buffer argument: ' + arg);
     }
   };
-  writeString(arg: any) {
+  writeString(arg: string | Buffer) {
     this.writeStringOrBinary('writeString', 'utf8', arg);
   };
-  writeBinary(arg: any) {
+  writeBinary(arg: string | Buffer) {
     this.writeStringOrBinary('writeBinary', 'binary', arg);
   };
 
-
-  readMessageBegin() {
+  readMessageBegin(): TMessage {
     var sz = this.readI32();
     var type, name, seqid;
 
@@ -179,53 +165,47 @@ export class TBinaryProtocol {
     }
     return { fname: name, mtype: type, rseqid: seqid };
   };
-  readMessageEnd() {
-  };
+  readMessageEnd() { };
 
-  readStructBegin() {
+  readStructBegin(): TStruct {
     return { fname: '' };
   };
-  readStructEnd() {
-  };
+  readStructEnd() { };
 
-  readFieldBegin() {
+  readFieldBegin(): TField {
     var type = this.readByte();
-    if (type == ThriftType.STOP) {
+    if (type == Thrift.Type.STOP) {
       return { fname: null, ftype: type, fid: 0 };
     }
     var id = this.readI16();
     return { fname: null, ftype: type, fid: id };
   };
-  readFieldEnd() {
-  };
+  readFieldEnd() { };
 
-  readMapBegin() {
+  readMapBegin(): TMap {
     var ktype = this.readByte();
     var vtype = this.readByte();
     var size = this.readI32();
     return { ktype: ktype, vtype: vtype, size: size };
   };
-  readMapEnd() {
-  };
+  readMapEnd() { };
 
 
-  readListBegin() {
+  readListBegin(): TList {
     var etype = this.readByte();
     var size = this.readI32();
     return { etype: etype, size: size };
   };
-  readListEnd() {
-  };
+  readListEnd() { };
 
-  readSetBegin() {
+  readSetBegin(): TSet {
     var etype = this.readByte();
     var size = this.readI32();
     return { etype: etype, size: size };
   };
-  readSetEnd() {
-  };
+  readSetEnd() { };
 
-  readBool() {
+  readBool(): boolean {
     var b = this.readByte();
     if (b === 0) {
       return false;
@@ -236,25 +216,21 @@ export class TBinaryProtocol {
   readByte() {
     return this.trans.readByte();
   };
-
   readI16() {
     return this.trans.readI16();
   };
-
   readI32() {
     return this.trans.readI32();
   };
-
   readI64() {
     var buff = this.trans.read(8);
     return BigInt(buff);
   };
-
   readDouble() {
     return this.trans.readDouble();
   };
 
-  readBinary() {
+  readBinary(): Buffer {
     var len = this.readI32();
     if (len === 0) {
       return new Buffer(0);
@@ -275,6 +251,7 @@ export class TBinaryProtocol {
     if (len < 0) {
       throw new Thrift.TProtocolException(Thrift.TProtocolExceptionType.NEGATIVE_SIZE, "Negative string size");
     }
+    // @ts-ignore
     return this.trans.readString(len);
   };
 
@@ -282,36 +259,36 @@ export class TBinaryProtocol {
     return this.trans;
   };
 
-  skip(type: ThriftType) {
+  skip(type: Thrift.Type) {
     switch (type) {
-      case ThriftType.STOP:
+      case Thrift.Type.STOP:
         return;
-      case ThriftType.BOOL:
+      case Thrift.Type.BOOL:
         this.readBool();
         break;
-      case ThriftType.BYTE:
+      case Thrift.Type.BYTE:
         this.readByte();
         break;
-      case ThriftType.I16:
+      case Thrift.Type.I16:
         this.readI16();
         break;
-      case ThriftType.I32:
+      case Thrift.Type.I32:
         this.readI32();
         break;
-      case ThriftType.I64:
+      case Thrift.Type.I64:
         this.readI64();
         break;
-      case ThriftType.DOUBLE:
+      case Thrift.Type.DOUBLE:
         this.readDouble();
         break;
-      case ThriftType.STRING:
+      case Thrift.Type.STRING:
         this.readString();
         break;
-      case ThriftType.STRUCT:
+      case Thrift.Type.STRUCT:
         this.readStructBegin();
         while (true) {
           var r = this.readFieldBegin();
-          if (r.ftype === ThriftType.STOP) {
+          if (r.ftype === Thrift.Type.STOP) {
             break;
           }
           this.skip(r.ftype);
@@ -319,7 +296,7 @@ export class TBinaryProtocol {
         }
         this.readStructEnd();
         break;
-      case ThriftType.MAP:
+      case Thrift.Type.MAP:
         var mapBegin = this.readMapBegin();
         for (var i = 0; i < mapBegin.size; ++i) {
           this.skip(mapBegin.ktype);
@@ -327,14 +304,14 @@ export class TBinaryProtocol {
         }
         this.readMapEnd();
         break;
-      case ThriftType.SET:
+      case Thrift.Type.SET:
         var setBegin = this.readSetBegin();
         for (var i2 = 0; i2 < setBegin.size; ++i2) {
           this.skip(setBegin.etype);
         }
         this.readSetEnd();
         break;
-      case ThriftType.LIST:
+      case Thrift.Type.LIST:
         var listBegin = this.readListBegin();
         for (var i3 = 0; i3 < listBegin.size; ++i3) {
           this.skip(listBegin.etype);
@@ -345,7 +322,6 @@ export class TBinaryProtocol {
         throw new Error("Invalid type: " + type);
     }
   };
-
 
 }
 

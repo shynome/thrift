@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import util from 'util';
 
 export enum Type {
   STOP = 0,
@@ -151,10 +150,6 @@ export class TProtocolException extends Error {
 
 export const objectLength = function (obj: any) {
   return Object.keys(obj).length;
-};
-
-export const inherits = function (constructor: any, superConstructor: any) {
-  util.inherits(constructor, superConstructor);
 };
 
 export const copyList = function (lst: any[], types: any) {

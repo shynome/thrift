@@ -17,6 +17,24 @@
  * under the License.
  */
 
+export interface TTransport {
+  commitPosition(): void;
+  rollbackPosition(): void;
+  isOpen(): boolean;
+  open(): boolean;
+  close(): boolean;
+  setCurrSeqId(seqId: number): void;
+  ensureAvailable(len: number): void;
+  read(len: number): Buffer;
+  readByte(): number;
+  readI16(): number;
+  readI32(): number;
+  readDouble(): number;
+  readString(): string;
+  write(buf: Buffer | string): void;
+  flush(): void;
+}
+
 export { TBufferedTransport } from './buffered_transport';
 export { TFramedTransport } from './framed_transport';
 export { InputBufferUnderrunError } from './input_buffer_underrun_error';
