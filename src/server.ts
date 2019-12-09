@@ -24,11 +24,28 @@ import tls from 'tls';
 import TBufferedTransport from './buffered_transport';
 import TBinaryProtocol from './binary_protocol';
 import InputBufferUnderrunError from './input_buffer_underrun_error';
+import { TTransportConstructor } from './transport';
+import { TProtocolConstructor } from './protocol';
+import { HttpHeaders } from './thrift';
 
-interface ServerOptions {
-  transport: any
-  protocol: any
-  tls: any
+export interface ServiceOptions<TProcessor, THandler> {
+  transport?: TTransportConstructor;
+  protocol?: TProtocolConstructor;
+  tls?: any
+  processor?: { new(handler: THandler): TProcessor };
+  handler?: THandler;
+}
+
+export interface ServiceMap<TProcessor, THandler> {
+  [uri: string]: ServerOptions<TProcessor, THandler>;
+}
+
+export interface ServerOptions<TProcessor, THandler> extends ServiceOptions<TProcessor, THandler> {
+  cors?: string[];
+  files?: string;
+  headers?: HttpHeaders;
+  services?: ServiceMap<TProcessor, THandler>;
+  tls?: tls.TlsOptions;
 }
 
 /**
@@ -37,7 +54,7 @@ interface ServerOptions {
  * @param options - Optional additional server configuration.
  * @returns - The Apache Thrift Multiplex Server.
  */
-export function createMultiplexServer(processor: any, options: ServerOptions): any {
+export function createMultiplexServer(processor: any, options: ServerOptions<any, any>): any {
   var transport = (options && options.transport) ? options.transport : TBufferedTransport;
   var protocol = (options && options.protocol) ? options.protocol : TBinaryProtocol;
 
@@ -104,15 +121,25 @@ export function createMultiplexServer(processor: any, options: ServerOptions): a
   }
 };
 
+export type TProcessorConstructor<TProcessor, THandler> =
+  { new(handler: THandler): TProcessor } |
+  { Processor: { new(handler: THandler): TProcessor } };
+
+import http from 'http'
+
 /**
  * Create a single service Apache Thrift server.
  * @param {object} processor - A service class or processor function.
  * @param {ServerOptions} options - Optional additional server configuration.
  * @returns {object} - The Apache Thrift Multiplex Server.
  */
-exports.createServer = function (processor: any, handler: any, options: ServerOptions) {
+export function createServer<TProcessor, THandler>(
+  processor: TProcessorConstructor<TProcessor, THandler>,
+  handler: THandler,
+  options?: ServerOptions<TProcessor, THandler>,
+): http.Server | tls.Server {
   if (processor.Processor) {
     processor = processor.Processor;
   }
-  return exports.createMultiplexServer(new processor(handler), options);
+  return createMultiplexServer(new processor(handler), options);
 };
