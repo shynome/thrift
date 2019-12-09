@@ -17,6 +17,7 @@
  * under the License.
  */
 import *as Thrift from './thrift';
+import { TClientConstructor, Connection } from './connection';
 
 function Wrapper(serviceName: any, protocol: any, connection: any) {
 
@@ -39,7 +40,7 @@ function Wrapper(serviceName: any, protocol: any, connection: any) {
 
 export class Multiplexer {
   seqid = 0;
-  createClient(serviceName: any, ServiceClient: any, connection: any) {
+  createClient<TClient>(serviceName: string, ServiceClient: TClientConstructor<TClient>, connection: Connection): TClient {
     if (ServiceClient.Client) {
       ServiceClient = ServiceClient.Client;
     }

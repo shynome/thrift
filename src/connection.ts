@@ -54,7 +54,11 @@ export interface ConnectOptions {
   nodeOptions?: http.RequestOptions | https.RequestOptions;
 }
 
-class Connection extends EventEmitter {
+export type TClientConstructor<TClient> =
+  { new(output: TTransport, pClass: { new(trans: TTransport): TProtocol }): TClient; } |
+  { Client: { new(output: TTransport, pClass: { new(trans: TTransport): TProtocol }): TClient; } };
+
+export class Connection extends EventEmitter {
   seqId2Service: SeqId2Service = {};
   connection: net.Socket;
   ssl: boolean;
